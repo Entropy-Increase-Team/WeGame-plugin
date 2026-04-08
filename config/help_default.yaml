@@ -1,0 +1,36 @@
+# 帮助内容
+# 说明：
+# 1. 如需自定义，请将本文件复制到 config/config/help.yaml 后再修改
+# 2. WeGame 核心命令默认使用 = 作为前缀
+# 3. 已安装游戏模块会自动把各自的 help group 追加到本帮助页
+
+help_title: "WeGame 帮助"
+help_sub_title: "默认前缀：{default_prefix}"
+
+help_layout:
+  col_count: 3
+  col_width: 340
+  width_gap: 18
+
+help_group:
+
+  - group: "基础指令"
+    list:
+      - icon: "img/logo.jpg"
+        title: "{default_prefix}帮助"
+        desc: "查看插件帮助菜单"
+      - icon: "img/logo.jpg"
+        title: "{default_prefix}qq登陆"
+        desc: "使用 QQ 扫码登录 WeGame"
+      - icon: "img/logo.jpg"
+        title: "{default_prefix}wx登陆"
+        desc: "使用微信扫码登录 WeGame"
+      - icon: "img/logo.jpg"
+        title: "{default_prefix}账号列表"
+        desc: "查看当前已绑定账号列表"
+      - icon: "img/logo.jpg"
+        title: "{default_prefix}切换账号 <序号>"
+        desc: "切换当前默认账号"
+      - icon: "img/logo.jpg"
+        title: "{default_prefix}删除账号 <序号>"
+        desc: "删除指定绑定账号"

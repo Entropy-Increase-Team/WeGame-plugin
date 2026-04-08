@@ -1,0 +1,7 @@
+/config/config/wgconfig.yaml
+/config/config/help.yaml
+/config/config/games/*.yaml
+!/config/config/games/.keep
+
+/modules/*
+!/modules/.keep

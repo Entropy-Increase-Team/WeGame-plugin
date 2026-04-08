@@ -1,0 +1,22 @@
+{
+  "name": "wegame-plugin",
+  "version": "0.1.0",
+  "description": "基于 Yunzai 的 WeGame 平台插件，支持核心登录能力与可扩展游戏模块",
+  "type": "module",
+  "module": "index.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "axios": "^1.7.8",
+    "yaml": "^2.8.0"
+  },
+  "keywords": [
+    "Yunzai-Bot",
+    "云崽",
+    "WeGame"
+  ],
+  "author": "Codex",
+  "license": "MIT"
+}

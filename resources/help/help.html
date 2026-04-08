@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width={{contentWidth}}, initial-scale=1.0">
+  <title>{{helpCfg.title}}</title>
+  <link rel="stylesheet" href="{{_res_path}}help/help.css">
+  <style>
+    html { width: {{contentWidth}}px; min-width: {{contentWidth}}px; box-sizing: border-box; }
+    body { width: 100%; max-width: {{contentWidth}}px; min-width: {{contentWidth}}px; box-sizing: border-box; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <main class="help-shell" style="width:100%;max-width:{{contentWidth}}px;box-sizing:border-box;">
+    <header class="hero">
+      <div class="hero-main">
+        <span class="hero-tag">WeGame Plugin</span>
+        <h1>{{helpCfg.title}}</h1>
+        <p>{{helpCfg.subTitle}}</p>
+      </div>
+    </header>
+
+    {{each helpGroup}}
+      {{if $value.type === 'tips' && $value.items}}
+    <section class="tips-section">
+      <div class="tips-grid">
+        {{each $value.items}}
+        <article class="tip-card">
+          <span class="tip-badge">{{$value.title}}</span>
+          <p class="tip-text">{{$value.text}}</p>
+        </article>
+        {{/each}}
+      </div>
+    </section>
+      {{else if $value.group && $value.list}}
+    <section class="group-section">
+      <div class="section-head">
+        <div class="section-copy">
+          <h2 class="section-title">{{$value.group}}</h2>
+        </div>
+        <span class="section-count">{{$value.list.length}} 条命令</span>
+      </div>
+
+      <div class="commands-grid" style="grid-template-columns:repeat({{colCount}}, {{colWidth}}px); gap: {{widthGap}}px;">
+        {{each $value.list}}
+        <article class="command-item">
+          {{if $value.iconPath}}
+          <div class="help-item-icon">
+            <img src="{{_res_path}}{{$value.iconPath}}" alt="">
+          </div>
+          {{/if}}
+          <div class="text-content">
+            <div class="command-name">{{$value.title}}</div>
+            <div class="command-description">{{$value.desc}}</div>
+          </div>
+        </article>
+        {{/each}}
+      </div>
+    </section>
+      {{/if}}
+    {{/each}}
+
+    <footer class="footer">
+      <div class="footer-line"></div>
+      <div class="copyright">{{copyright}}</div>
+    </footer>
+  </main>
+</body>
+</html>
