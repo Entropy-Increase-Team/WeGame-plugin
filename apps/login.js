@@ -88,7 +88,6 @@ export class WeGameLogin extends plugin {
       }
 
       const syncResult = await this.accountService.syncLoginCredential(normalized)
-      await this.accountService.saveLocalCredential(syncResult.credential)
       await this.reply(this.buildSuccessReply(syncResult))
       return true
     } catch (error) {

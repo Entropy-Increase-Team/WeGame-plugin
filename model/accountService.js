@@ -78,6 +78,42 @@ function mergeCredential (baseCredential, overrideCredential = {}) {
   return merged || base
 }
 
+function isSameCredential (left = {}, right = {}) {
+  const leftToken = String(left?.frameworkToken || '').trim()
+  const rightToken = String(right?.frameworkToken || '').trim()
+
+  if (leftToken && rightToken) {
+    return leftToken === rightToken
+  }
+
+  const leftRoleId = String(left?.role?.id || '').trim()
+  const rightRoleId = String(right?.role?.id || '').trim()
+
+  if (leftRoleId && rightRoleId) {
+    return leftRoleId === rightRoleId
+  }
+
+  return false
+}
+
+function hasRoleDisplayInfo (credential = {}) {
+  const role = credential?.role || {}
+  return Boolean(String(role.id || '').trim() && String(role.name || '').trim())
+}
+
+function hasRoleDetailInfo (credential = {}) {
+  const role = credential?.role || {}
+
+  return Boolean(
+    String(role.id || '').trim() &&
+    String(role.name || '').trim() &&
+    String(role.create_time || '').trim() &&
+    role.is_online !== undefined &&
+    role.level !== undefined &&
+    role.star !== undefined
+  )
+}
+
 export default class WeGameAccountService {
   constructor (e) {
     this.e = e
@@ -95,6 +131,102 @@ export default class WeGameAccountService {
   async saveLocalCredential (credential) {
     if (!credential?.frameworkToken) return null
     return saveLastCredential(this.getUserIdentifier(), credential)
+  }
+
+  async buildMergedLocalCredential (credential) {
+    const normalized = normalizeCredential(credential)
+    if (!normalized) return null
+
+    const localCredential = await this.getLocalCredential()
+    if (!localCredential || !isSameCredential(localCredential, normalized)) {
+      return normalized
+    }
+
+    return mergeCredential(localCredential, normalized) || normalized
+  }
+
+  async queryLatestCredential (credential) {
+    const normalized = normalizeCredential(credential)
+    if (!normalized?.frameworkToken) {
+      return {
+        credential: normalized,
+        binding: null,
+        bindings: []
+      }
+    }
+
+    let current = normalized
+    let binding = null
+    let bindings = []
+
+    try {
+      const latest = normalizeCredential(await this.api.getLoginToken(
+        normalized.loginType || 'qq',
+        normalized.frameworkToken,
+        this.getUserIdentifier()
+      ))
+
+      if (latest) {
+        current = mergeCredential(current, latest) || current
+      }
+    } catch (error) {}
+
+    try {
+      const result = await this.findBindingByFrameworkToken(normalized.frameworkToken, {
+        retries: 0
+      })
+
+      binding = result.binding || null
+      bindings = result.bindings || []
+
+      if (binding) {
+        current = mergeCredential(current, bindingToCredential(binding)) || current
+      }
+    } catch (error) {}
+
+    return {
+      credential: current,
+      binding,
+      bindings
+    }
+  }
+
+  async settleCredential (credential, options = {}) {
+    const normalized = normalizeCredential(credential)
+    if (!normalized) {
+      return {
+        credential: null,
+        binding: null,
+        bindings: []
+      }
+    }
+
+    const retries = Math.max(0, Number(options.retries ?? 4))
+    const intervalMs = Math.max(0, Number(options.intervalMs ?? 600))
+    let current = normalized
+    let binding = null
+    let bindings = []
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const snapshot = await this.queryLatestCredential(current)
+      current = snapshot.credential || current
+      binding = snapshot.binding || binding
+      bindings = snapshot.bindings?.length ? snapshot.bindings : bindings
+
+      if (hasRoleDetailInfo(current) && (binding?.id || hasRoleDisplayInfo(current))) {
+        break
+      }
+
+      if (attempt < retries) {
+        await sleep(intervalMs)
+      }
+    }
+
+    return {
+      credential: current,
+      binding,
+      bindings
+    }
   }
 
   hasApiKey () {
@@ -165,31 +297,44 @@ export default class WeGameAccountService {
     const credential = normalizeCredential(payload)
     if (!credential) throw new Error('登录成功，但凭证数据不完整')
 
-    await saveLastCredential(this.getUserIdentifier(), credential)
+    const settled = await this.settleCredential(credential, {
+      retries: 5,
+      intervalMs: 700
+    })
+    const settledCredential = settled.credential || credential
+    const settledBinding = settled.binding || null
+    const settledBindings = settled.bindings || []
+
+    await saveLastCredential(this.getUserIdentifier(), settledCredential)
 
     try {
-      const { binding, bindings } = await this.findBindingByFrameworkToken(credential.frameworkToken)
+      const binding = settledBinding
+      const bindings = settledBindings
 
       if (binding?.id && !binding.isPrimary) {
         const switched = await this.switchPrimaryBinding(binding.id)
-        const switchedCredential = mergeCredential(credential, switched.credential)
+        const switchedCredential = mergeCredential(settledCredential, switched.credential)
+        const finalCredential = switchedCredential || settledCredential
 
         return {
-          credential: switchedCredential || credential,
+          credential: finalCredential,
           binding: switched.binding || binding,
           bindings: switched.bindings || bindings,
           autoSwitched: true
         }
       }
 
+      const finalCredential = mergeCredential(settledCredential, bindingToCredential(binding)) || settledCredential
+      await saveLastCredential(this.getUserIdentifier(), finalCredential)
+
       return {
-        credential: mergeCredential(credential, bindingToCredential(binding)) || credential,
+        credential: finalCredential,
         binding,
         bindings,
         autoSwitched: false
       }
     } catch (error) {
-      return { credential, binding: null, bindings: [], autoSwitched: false }
+      return { credential: settledCredential, binding: settledBinding, bindings: settledBindings, autoSwitched: false }
     }
   }
 
@@ -197,15 +342,20 @@ export default class WeGameAccountService {
     try {
       const bindings = await this.listBindings()
       const binding = this.pickActiveBinding(bindings)
-      const credential = bindingToCredential(binding)
+      const mergedCredential = await this.buildMergedLocalCredential(bindingToCredential(binding))
+      const settled = await this.settleCredential(mergedCredential, {
+        retries: 2,
+        intervalMs: 500
+      })
+      const credential = settled.credential || mergedCredential
 
       if (credential?.frameworkToken) {
         await saveLastCredential(this.getUserIdentifier(), credential)
         return {
           source: 'binding',
-          binding,
+          binding: settled.binding || binding,
           credential,
-          bindings
+          bindings: settled.bindings?.length ? settled.bindings : bindings
         }
       }
     } catch (error) {}
@@ -228,7 +378,12 @@ export default class WeGameAccountService {
     const bindings = await this.listBindings()
     const requestedBinding = bindings.find((item) => item.id === String(bindingId || '').trim()) || null
     const binding = requestedBinding || this.pickActiveBinding(bindings)
-    const credential = bindingToCredential(binding)
+    const mergedCredential = await this.buildMergedLocalCredential(bindingToCredential(binding))
+    const settled = await this.settleCredential(mergedCredential, {
+      retries: 2,
+      intervalMs: 500
+    })
+    const credential = settled.credential || mergedCredential
 
     if (credential?.frameworkToken) {
       await saveLastCredential(this.getUserIdentifier(), credential)
@@ -237,9 +392,9 @@ export default class WeGameAccountService {
     }
 
     return {
-      binding,
+      binding: settled.binding || binding,
       credential,
-      bindings
+      bindings: settled.bindings?.length ? settled.bindings : bindings
     }
   }
 
@@ -248,7 +403,12 @@ export default class WeGameAccountService {
 
     const bindings = await this.listBindings()
     const binding = this.pickActiveBinding(bindings)
-    const credential = bindingToCredential(binding)
+    const mergedCredential = await this.buildMergedLocalCredential(bindingToCredential(binding))
+    const settled = await this.settleCredential(mergedCredential, {
+      retries: 2,
+      intervalMs: 500
+    })
+    const credential = settled.credential || mergedCredential
 
     if (credential?.frameworkToken) {
       await saveLastCredential(this.getUserIdentifier(), credential)
@@ -257,9 +417,9 @@ export default class WeGameAccountService {
     }
 
     return {
-      binding,
+      binding: settled.binding || binding,
       credential,
-      bindings
+      bindings: settled.bindings?.length ? settled.bindings : bindings
     }
   }
 }
