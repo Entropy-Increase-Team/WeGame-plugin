@@ -11,16 +11,11 @@
 
 游戏查询能力不直接堆在核心层里，而是放到各自的游戏模块中。
 
-## 当前状态
+## 下载
 
-目前核心插件已接入：
-
-- `=帮助`
-- `=qq登陆`
-- `=wx登陆`
-- `=账号列表`
-- `=切换账号 <序号>`
-- `=删除账号 <序号>`
+```bash
+git clone https://github.com/Entropy-Increase-Team/WeGame-plugin.git ./plugins/WeGame-plugin
+```
 
 ## 配置说明
 
