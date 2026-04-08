@@ -89,6 +89,8 @@ git clone https://github.com/Entropy-Increase-Team/WeGame-plugin.git ./plugins/W
 - `=qq登陆`
 - `=wx登陆`
 - `=账号列表`
+- `=模块`
+- `=模块下载 <模块名>`
 - `=切换账号 1`
 - `=删除账号 1`
 
@@ -118,6 +120,7 @@ git clone https://github.com/Entropy-Increase-Team/WeGame-plugin.git ./plugins/W
 - `main` 分支对应本地的 `modules/WeGame-GameModules/`
 - 各游戏模块使用独立分支
 - 分支名与模块名保持一致，例如 `rocom` 模块使用 `rocom` 分支
+- `=模块` 和 `=模块下载` 会直接查询 GitHub 仓库分支，并自动排除 `main`
 
 ## 目录结构
 
