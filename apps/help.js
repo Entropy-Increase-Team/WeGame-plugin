@@ -1,5 +1,5 @@
 import { buildCommandReg, COMMAND_PREFIXES, formatCommand } from '../utils/command.js'
-import { getHelpConfig, getModuleHelpGroups } from '../utils/helpConfig.js'
+import { getHelpConfig } from '../utils/helpConfig.js'
 import ModuleService from '../model/moduleService.js'
 
 function applyPlaceholders (value = '') {
@@ -32,9 +32,26 @@ function normalizeHelpGroups (groups = []) {
   })
 }
 
-function buildModuleHelpGroups () {
-  return ModuleService.getInstalledModules()
-    .flatMap((moduleItem) => normalizeHelpGroups(getModuleHelpGroups(moduleItem.code)))
+function buildModuleEntryGroups (groupTitle = '游戏模块') {
+  const normalizedGroupTitle = applyPlaceholders(groupTitle).trim() || '游戏模块'
+  const moduleItems = ModuleService.getHelpItems()
+    .map((item) => ({
+      iconPath: String(item?.iconPath || '').trim(),
+      title: applyPlaceholders(item?.title || ''),
+      desc: applyPlaceholders(item?.desc || '')
+    }))
+    .filter((item) => item.title || item.desc)
+
+  if (moduleItems.length === 0) {
+    return []
+  }
+
+  return [
+    {
+      group: normalizedGroupTitle,
+      list: moduleItems
+    }
+  ]
 }
 
 function buildFallbackText (helpCfg = {}, helpGroup = []) {
@@ -101,7 +118,7 @@ export class WeGameHelp extends plugin {
     }
     const helpGroup = [
       ...normalizeHelpGroups(helpSetting?.help_group),
-      ...buildModuleHelpGroups()
+      ...buildModuleEntryGroups(helpSetting?.module_group_title || '游戏模块')
     ]
     const layout = {
       colCount: Math.max(1, Number(helpSetting?.help_layout?.col_count) || 3),

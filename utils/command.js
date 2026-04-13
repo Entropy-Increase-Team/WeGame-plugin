@@ -12,8 +12,15 @@ function buildCommandReg (bodyPattern = '') {
 }
 
 function stripCommandPrefix (message = '', commandLiteral = '') {
-  const pattern = new RegExp(`^${COMMAND_PREFIX_PATTERN}\\s*${escapeRegExp(commandLiteral)}`)
-  return String(message || '').replace(pattern, '').trim()
+  const text = String(message || '').trim()
+  const pattern = new RegExp(`^${COMMAND_PREFIX_PATTERN}\\s*${escapeRegExp(commandLiteral)}(?:\\s+|$)`)
+  const matched = text.match(pattern)
+
+  if (!matched) {
+    return ''
+  }
+
+  return text.slice(matched[0].length).trim()
 }
 
 function formatCommand (command = '') {

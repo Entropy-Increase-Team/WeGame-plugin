@@ -1,12 +1,11 @@
 wegame:
   # WeGame 后端地址，结尾不要带 /
-  # 示例：
-  base_url: 
+  base_url: https://wegame.shallow.ink
 
-  # WeGame 核心层 API Key，scope 必须是 wegame
+  # 开发者 WeGame API Key，scope 必须是 wegame
   # 示例：xx_xxxx_xxxxxxxxxxxxxxxx
-  # 用于登录、账号绑定、账号管理等 WeGame 平台接口
-  # 各游戏模块自己的 API Key 请填写到 config/config/games/<module>.yaml
+  # 用于登录、账号绑定、账号管理，以及已获批权限的游戏模块接口
+  # 例如 rocom 模块需要这把 key 已获批 game:rocom 下的 rocom.access
   # 若留空，会自动尝试匿名令牌，仅可用于无需 API Key 的接口
   api_key: ''
 

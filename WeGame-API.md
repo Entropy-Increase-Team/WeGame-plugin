@@ -2,6 +2,10 @@
 
 本文档描述共享 WeGame 登录层与平台侧接口，不包含具体游戏模块接口。
 
+如果你要查看前端页面、用户中心和开发者控制台直接使用的 Web 接口，请看：
+
+- [WeGame-Web-API.md](./WeGame-Web-API.md)
+
 当前覆盖能力：
 
 - 健康检查
@@ -12,7 +16,8 @@
 
 游戏模块文档：
 
-- [Rocom-API.md](./modules/rocom/Rocom-API.md)
+- [Rocom-API.md](./Rocom-API.md)
+- [DF-API.md](./DF-API.md)
 
 ## 核心原则
 
@@ -54,6 +59,13 @@
 - `GET /health`
 - `GET /health/detailed`
 
+说明：
+
+- `GET /health` 仅返回进程基础状态
+- `GET /health/detailed` 会检查 PostgreSQL 和 Redis
+- PostgreSQL 不可用时返回 `503`
+- Redis 不可用但 PostgreSQL 正常时返回 `200`，`data.status` 为 `degraded`
+
 ## 已接入游戏列表
 
 - `GET /api/v1/games`
@@ -62,6 +74,8 @@
 
 - 返回当前服务已接入的游戏目录
 - 每个游戏项会给出 `code`、`name`、正式接口前缀 `api_base_path`
+- `api_key_scope` 固定为开发者统一使用的 `wegame`
+- `permission_scope` 表示申请对应游戏权限时使用的 scope
 - 各游戏接口统一走 `/api/v1/games/<game_code>/*`
 
 响应示例：
@@ -76,10 +90,18 @@
         "code": "rocom",
         "name": "洛克王国世界",
         "api_base_path": "/api/v1/games/rocom",
-        "scope": "game:rocom"
+        "api_key_scope": "wegame",
+        "permission_scope": "game:rocom"
+      },
+      {
+        "code": "df",
+        "name": "三角洲行动",
+        "api_base_path": "/api/v1/games/df",
+        "api_key_scope": "wegame",
+        "permission_scope": "game:df"
       }
     ],
-    "total": 1
+    "total": 2
   }
 }
 ```
@@ -94,9 +116,9 @@
 
 说明：
 
-- 如果使用 `X-API-Key`，它必须与接口所属作用域匹配
-- WeGame 登录与绑定相关接口使用 `scope=wegame`
-- 游戏接口使用各自的 `scope=game:<game_code>`，具体看对应游戏文档
+- 如果使用 `X-API-Key`，统一使用开发者 `WeGame API Key`
+- WeGame 登录、绑定和平台侧接口直接使用这把 `wegame` Key 即可
+- 游戏接口仍然使用同一把 `wegame` Key，但还需要提前获批对应游戏权限，具体看对应游戏文档
 
 匿名访问令牌可通过以下接口获取：
 
@@ -105,10 +127,12 @@
 说明：
 
 - `/api/v1/login/wegame/*` 这组接口不强制要求 `API Key`
-- 如果带 `X-API-Key` 调用这组接口，必须使用 `scope=wegame`
+- 如果带 `X-API-Key` 调用这组接口，使用开发者 `WeGame API Key` 即可
 - 机器人 / 插件场景推荐先申请匿名令牌，再带 `X-Anonymous-Token` 调用 WeGame 登录接口
 - `POST /api/v1/auth/anonymous-token` 支持传 `fingerprint`
 - 如果没有传 `fingerprint`，服务端会根据请求信息自动生成一个匿名指纹
+- 匿名令牌依赖 Redis；Redis 不可用时该接口会返回 `503`
+- 匿名令牌固定 `24` 小时过期，累计最多校验 `1000` 次
 
 请求示例：
 
@@ -144,8 +168,16 @@
 这组登录接口支持以下任一认证方式：
 
 - `X-Anonymous-Token`
-- `X-API-Key`，但必须使用 `scope=wegame`
+- `X-API-Key`，使用开发者 `WeGame API Key`
 - `Authorization: Bearer <web-jwt>`
+
+另外需要注意：
+
+- `frameworkToken` 的登录管理接口现在按“创建它的当前身份”做 owner 校验
+- Web 用户创建 / 导入的凭证，后续只能由同一个 Web 用户继续轮询、查询、刷新、删除
+- API Key 创建 / 导入的凭证，后续至少要用同一位开发者的 `WeGame API Key`；如果创建时带了 `user_identifier`，后续还必须带同一个 `user_identifier`
+- 匿名身份创建的凭证，只能由同一匿名指纹继续轮询和管理
+- 具体游戏数据接口仍然是“拿到 `frameworkToken` 就能访问对应游戏能力”；这里的 owner 约束只针对登录管理接口
 
 推荐接入流程：
 
@@ -167,9 +199,10 @@
 
 说明：
 
-- 第三方客户端在带 `scope=wegame` 的 `X-API-Key` 情况下，如果这里同时传了 `user_identifier`
+- 第三方客户端在带开发者 `WeGame API Key` 的情况下，如果这里同时传了 `user_identifier`
 - 登录成功后后端会自动创建或更新账号绑定
 - 这样后续可以直接查询 `/api/v1/user/bindings`
+- 这个二维码会绑定当前调用身份；后续轮询状态时要继续使用同一身份
 
 响应示例：
 
@@ -216,6 +249,10 @@
 - `done`: 登录成功
 - `expired`: 二维码过期
 
+说明：
+
+- 轮询状态时会校验当前身份是否就是创建该二维码的身份
+
 ### 微信扫码登录
 
 `GET /api/v1/login/wegame/wechat/qr`
@@ -228,9 +265,10 @@
 
 说明：
 
-- 第三方客户端在带 `scope=wegame` 的 `X-API-Key` 情况下，如果这里同时传了 `user_identifier`
+- 第三方客户端在带开发者 `WeGame API Key` 的情况下，如果这里同时传了 `user_identifier`
 - 登录成功后后端会自动创建或更新账号绑定
 - 这样后续可以直接查询 `/api/v1/user/bindings`
+- 这个二维码会绑定当前调用身份；后续轮询状态时要继续使用同一身份
 
 响应示例：
 
@@ -276,6 +314,10 @@
 
 这两个接口都会返回当前 `frameworkToken` 对应的已保存 WeGame 凭证信息。
 
+说明：
+
+- 调用这两个查询接口时，也会校验当前身份是否就是创建该 `frameworkToken` 的身份
+
 ### 导入凭证
 
 `POST /api/v1/login/wegame/token`
@@ -297,13 +339,21 @@
 - `user_identifier / client_type / client_id` 仅第三方客户端自动绑定时需要
 - 如果第三方导入凭证时传了 `user_identifier`，后端会自动创建或更新账号绑定
 - 如果登录时没传 `user_identifier`，后续仍可单独调用 `POST /api/v1/user/bindings` 绑定
+- 导入得到的这份 `frameworkToken` 同样会绑定当前调用身份，后续查询 / 刷新 / 删除都要用同一身份
 
 返回核心字段：
 
 - `frameworkToken`
 - `tgpId`
 - `isValid`
-- `role`
+- `loginType`
+
+说明：
+
+- 共享 WeGame 层默认只返回 WeGame 凭证信息
+- 如果需要 `rocom`、`df` 等具体游戏的角色资料，请改调各游戏模块接口
+- 例如 RoCom 角色资料看 [Rocom-API.md](./Rocom-API.md) 的 `GET /api/v1/games/rocom/profile/role`
+- DF 角色资料看 [DF-API.md](./DF-API.md) 的 `GET /api/v1/games/df/profile/role`
 
 响应示例：
 
@@ -328,16 +378,6 @@
       "is_valid": true,
       "created_at": "2026-04-06T16:30:00+08:00",
       "updated_at": "2026-04-06T16:30:00+08:00"
-    },
-    "role": {
-      "openid": "xxxxxxxx",
-      "id": "xxxxxxxx",
-      "name": "你的角色名",
-      "avatar": "https://...",
-      "create_time": "2025-01-01 12:00:00",
-      "is_online": 0,
-      "level": 100,
-      "star": 5
     }
   }
 }
@@ -410,6 +450,7 @@
 - 手动导入的 `tgp_id + tgp_ticket` 凭证不支持刷新
 - `WeGame 微信扫码` 当前也不支持同类刷新
 - 原因是现有微信链路只拿到一次性的 `wxCode -> tgp_ticket` 结果，没有可持续复用的 refresh 凭据
+- 刷新前会先校验当前身份是否有权管理这份 `frameworkToken`
 
 响应示例：
 
@@ -435,6 +476,10 @@
 请求头：
 
 - `X-Framework-Token: <frameworkToken>`
+
+说明：
+
+- 删除前会先校验当前身份是否有权管理这份 `frameworkToken`
 
 响应示例：
 
@@ -467,7 +512,7 @@
 第三方客户端说明：
 
 - `user_identifier` 可放在 query 参数或 `X-User-Identifier` 请求头
-- 第三方客户端这里必须使用 `scope=wegame` 的 API Key
+- 第三方客户端这里统一使用开发者 `WeGame API Key`
 - 这三类接口都会按当前用户作用域操作，不会串账号
 
 ### 账号列表
@@ -483,6 +528,13 @@
 - 返回当前用户已绑定的全部 WeGame 账号
 - `is_primary=true` 表示当前默认账号
 - `is_valid=false` 表示当前绑定凭证已失效
+- 如果需要当前用户在某个游戏下的账号列表，请使用对应游戏组件的 `accounts` 接口
+- 共享绑定接口默认只返回 WeGame 层信息，不区分具体游戏角色资料
+- 例如 RoCom 账号列表用 `GET /api/v1/games/rocom/accounts`
+- DF 账号列表用 `GET /api/v1/games/df/accounts`
+- 如果需要具体游戏角色资料，请使用对应游戏组件接口查询
+- 例如 RoCom 用 `GET /api/v1/games/rocom/profile/role`
+- DF 用 `GET /api/v1/games/df/profile/role`
 - 第三方如果登录时没传 `user_identifier`，这里不会自动出现账号，需要后续手动调一次 `POST /api/v1/user/bindings`
 
 响应示例：
@@ -500,10 +552,6 @@
         "login_type": "qq",
         "client_type": "web",
         "tgp_id": "295231685",
-        "role_id": "10000001",
-        "role_openid": "oA1234567890",
-        "nickname": "洛克训练师",
-        "avatar": "https://game.gtimg.cn/avatar.png",
         "is_primary": true,
         "is_valid": true,
         "created_at": "2026-04-05T22:10:00+08:00",
@@ -516,10 +564,6 @@
         "login_type": "wechat",
         "client_type": "web",
         "tgp_id": "295231999",
-        "role_id": "10000002",
-        "role_openid": "oA1234567899",
-        "nickname": "世界冒险家",
-        "avatar": "https://game.gtimg.cn/avatar2.png",
         "is_primary": false,
         "is_valid": true,
         "created_at": "2026-04-05T22:15:00+08:00",
@@ -616,8 +660,9 @@
 
 - 用于刷新指定绑定对应的 `framework_token`
 - 刷新成功后会返回新的 `framework_token`
-- 该接口适用于“绑定层 token 刷新”，不是 WeGame QQ 凭证的底层刷新接口
-- 如果底层 WeGame 凭证本身不可刷新，这里也会失败
+- 该接口适用于“绑定层 token 轮换”，不是 WeGame QQ 凭证的底层刷新接口
+- 只要底层凭证记录仍然存在且当前有效，就可以轮换新的 `framework_token`
+- 如果底层凭证记录已丢失或已经失效，这里会失败
 
 响应示例：
 
@@ -659,28 +704,22 @@
 
 ## 开发者 API Key
 
-开发者 API Key 现在已经改成按作用域分层：
+开发者 API Key 已经调整为单一模型：
 
-- `wegame`
-- `game:<game_code>`
+- 每个开发者仅维护 1 个 `WeGame API Key`
+- 游戏能力不再额外创建 `game:*` API Key
+- 后续访问具体游戏时，统一依据对应游戏权限决定是否放行
 
-当前已注册游戏里，会自动出现对应 scope。比如洛克王国世界就是：
-
-- `game:rocom`
-
-同一用户同一 scope 只允许存在 1 个有效 API Key，所以现在是 `1 + n` 的结构：
-
-- 1 个 `wegame` key
-- n 个各游戏自己的 key
-
-当前开发者能力使用 PostgreSQL，并且按 schema 隔离：
+当前开发者能力使用 PostgreSQL：
 
 - `wegame.api_keys`
+- `wegame.api_permissions`
+- `wegame.api_key_permissions`
+- `wegame.api_permission_requests`
 - `wegame.api_usage_stats`
-- `game_<game_code>.api_keys`
 - `game_<game_code>.api_usage_stats`
 
-旧的权限申请与动态权限守卫已经移除，不再使用 `api_permissions` / `api_permission_requests`。
+也就是说，API Key 只有一把；平台层请求统计和全部权限数据都在 `wegame` schema，各游戏接口统计按游戏落在各自 schema。
 
 以下接口都要求 `Authorization: Bearer <web-jwt>`：
 
@@ -688,25 +727,23 @@
 - `GET /api/v1/developer/api-keys`
 - `POST /api/v1/developer/api-keys`
 - `DELETE /api/v1/developer/api-keys/:id`
-- `GET /api/v1/developer/api-keys/:id/reveal`
 - `POST /api/v1/developer/api-keys/:id/regenerate`
 - `PUT /api/v1/developer/api-keys/:id/settings`
 
 如果暂时没有 Web 用户，也可以直接在服务根目录执行：
 
 ```bash
-go run ./cmd/api-keygen --scope wegame
-go run ./cmd/api-keygen --scope game:rocom
+go run ./cmd/api-keygen
 ```
 
 常用参数：
 
 - `--user-id <24位ObjectID>`: 指定归属用户
-- `--scope <scope>`: 例如 `wegame` 或 `game:rocom`
-- `--name <名称>`: 可选，不传则按 scope 自动生成
+- `--scope <scope>`: 当前仅支持 `wegame`
+- `--name <名称>`: 可选，不传则自动生成开发者 WeGame API Key
 
 如果不传 `--user-id`，命令会自动生成一个新的用户 ID，并一起打印出来。
-如果你要生成同一套 `1 + n` 的 key，请复用同一个 `--user-id`。
+生成完成后，后续游戏权限通过开发者控制台申请，例如 `scope=game:rocom` 下的 `rocom.access`。
 
 输出示例：
 
@@ -715,9 +752,9 @@ database=wegame_api
 generated_user_id=true
 user_id=69d27d62b4a01afd687c1814
 api_key_id=69d27d62b4a01afd687c1815
-scope=game:rocom
+scope=wegame
 api_key=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-name=洛克王国世界 API Key
+name=开发者 WeGame API Key
 rate_limit=60
 ```
 
@@ -736,13 +773,7 @@ rate_limit=60
       {
         "scope": "wegame",
         "kind": "platform",
-        "name": "WeGame 登录层"
-      },
-      {
-        "scope": "game:rocom",
-        "kind": "game",
-        "name": "洛克王国世界",
-        "game_code": "rocom"
+        "name": "开发者 WeGame API Key"
       }
     ]
   }
@@ -764,7 +795,7 @@ rate_limit=60
       {
         "id": "67f138724436d8d0d82f8e31",
         "scope": "wegame",
-        "name": "WeGame 登录层 API Key",
+        "name": "开发者 WeGame API Key",
         "key_prefix": "sk-3f8a...",
         "rate_limit": 60,
         "origin_whitelist": ["https://bot.example.com"],
@@ -778,13 +809,7 @@ rate_limit=60
       {
         "scope": "wegame",
         "kind": "platform",
-        "name": "WeGame 登录层"
-      },
-      {
-        "scope": "game:rocom",
-        "kind": "game",
-        "name": "洛克王国世界",
-        "game_code": "rocom"
+        "name": "开发者 WeGame API Key"
       }
     ]
   }
@@ -799,8 +824,7 @@ rate_limit=60
 
 ```json
 {
-  "scope": "game:rocom",
-  "name": "AstrBot Rocom"
+  "name": "AstrBot Production"
 }
 ```
 
@@ -814,8 +838,8 @@ rate_limit=60
     "key": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     "details": {
       "id": "67f138724436d8d0d82f8e31",
-      "scope": "game:rocom",
-      "name": "AstrBot Rocom",
+      "scope": "wegame",
+      "name": "AstrBot Production",
       "key_prefix": "sk-3f8a...",
       "rate_limit": 60,
       "total_calls": 0,
@@ -826,11 +850,11 @@ rate_limit=60
 }
 ```
 
-如果同一用户已经创建过该 scope 的 key，再次创建会直接报错。
+如果同一用户已经创建过开发者 API Key，再次创建会直接报错。
+明文 key 不支持后续回显；如果遗失，请直接重新生成。
 
-### 查看、删除、重置 API Key
+### 删除、重置 API Key
 
-- `GET /api/v1/developer/api-keys/:id/reveal`
 - `DELETE /api/v1/developer/api-keys/:id`
 - `POST /api/v1/developer/api-keys/:id/regenerate`
 
@@ -852,8 +876,35 @@ rate_limit=60
 说明：
 
 - `origin_whitelist` 支持域名、完整 URL、或 `*.example.com` 这种后缀匹配
-- `ip_whitelist` 当前只支持精确 IP 匹配，不支持 CIDR 网段
-- `rate_limit` 为单 key 的每分钟请求上限
+- `ip_whitelist` 当前只支持精确 IP 匹配，不支持 CIDR 网段；无效 IP 会直接报错
+- `rate_limit` 为单 key 的每分钟请求上限，必须大于 `0`
+- 如果传入 `name`，不能为空白字符串
+- 服务端会自动裁剪空白并规范化 `origin_whitelist` / `ip_whitelist` 中的有效条目
+
+### 游戏权限申请
+
+单一开发者 API Key 创建完成后，访问游戏接口需要再申请对应游戏权限。
+
+示例：
+
+- `GET /api/v1/developer/permissions?scope=game:rocom`
+- `POST /api/v1/developer/api-keys/:id/permissions`
+
+提交权限申请时，请求体需要显式带上 `scope`，例如：
+
+```json
+{
+  "scope": "game:rocom",
+  "permission_code": "rocom.access",
+  "reason": "需要接入洛克王国世界开放接口"
+}
+```
+
+如果要撤销已授予权限，也需要显式带 `scope`，例如：
+
+- `DELETE /api/v1/developer/api-keys/:id/permissions/rocom.access?scope=game:rocom`
+
+当前洛克王国世界默认提供 `rocom.access` 权限，获批后即可使用 `/api/v1/games/rocom/*` 下的开放接口。
 
 响应示例：
 

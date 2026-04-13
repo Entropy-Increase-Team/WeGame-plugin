@@ -237,7 +237,7 @@ export class WeGameLogin extends plugin {
       }
 
       const nodes = bindings.map((binding, index) => this.buildBindingCard(binding, index, bindings.length))
-      const forwardMsg = await common.makeForwardMsg(this.e, nodes, 'WeGame 账号列表')
+      const forwardMsg = await common.makeForwardMsg(this.e, nodes, 'WeGame 绑定列表')
       await this.reply(forwardMsg)
       return true
     } catch (error) {
@@ -267,7 +267,7 @@ export class WeGameLogin extends plugin {
         `已切换默认账号为：${this.getBindingName(current)}`,
         `登录方式：${getLoginTypeLabel(current.loginType)}`,
         `角色ID：${current.roleId || '未返回'}`,
-        `后续 ${formatCommand('档案')} 和 ${formatCommand('精灵列表')} 会使用这个账号。`
+        '后续游戏模块查询会优先使用这个账号。'
       ].join('\n'))
       return true
     } catch (error) {
@@ -359,15 +359,20 @@ export class WeGameLogin extends plugin {
 
     const lines = [
       `序号：${index + 1}/${total}`,
-      `昵称：${this.getBindingName(binding)}`,
+      `显示名：${this.getBindingName(binding)}`,
       `状态：${tags.join(' | ')}`,
       `登录方式：${getLoginTypeLabel(binding.loginType)}`,
-      `角色ID：${binding.roleId || '未返回'}`,
+      `TGP ID：${binding.tgpId || '未返回'}`,
       `更新时间：${this.formatBindingTime(binding.updatedAt)}`
     ]
 
+    if (binding.roleId) {
+      lines.push(`角色ID：${binding.roleId}`)
+    }
+
     if (index === total - 1) {
       lines.push('')
+      lines.push('说明：这里只展示 WeGame 绑定信息，具体游戏角色资料请使用对应游戏模块查询。')
       lines.push(`切换：${formatCommand('切换账号 <序号>')}`)
       lines.push(`删除：${formatCommand('删除账号 <序号>')}`)
     }
@@ -389,15 +394,18 @@ export class WeGameLogin extends plugin {
     const lines = ['登录成功。']
 
     const nickname = binding.nickname || role.name || '未返回'
-    lines.push(`昵称：${nickname}`)
+    const wegameId = binding.tgpId || credential.tgpId || '未返回'
+    if (nickname !== '未返回') {
+      lines.push(`昵称：${nickname}`)
+    } else {
+      lines.push(`WeGameID：${wegameId}`)
+    }
     lines.push(`状态：${this.buildStatusText(binding, credential)}`)
     lines.push(`登录方式：${getLoginTypeLabel(binding.loginType || credential.loginType)}`)
 
     const roleId = role.id || binding.roleId
     if (roleId) {
       lines.push(`角色ID：${roleId}`)
-    } else {
-      lines.push('角色ID：未返回')
     }
 
     if (String(Config.get('wegame', 'api_key') || '').trim()) {

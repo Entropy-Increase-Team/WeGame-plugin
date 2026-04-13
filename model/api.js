@@ -45,10 +45,6 @@ function normalizeClientType (value) {
   return text
 }
 
-function normalizeGameCode (value = '') {
-  return String(value || '').trim().toLowerCase()
-}
-
 export { createRequestError }
 
 export default class WeGameApi {
@@ -130,20 +126,6 @@ export default class WeGameApi {
     return apiKey
   }
 
-  getGameApiKey (gameCode = '') {
-    const normalized = normalizeGameCode(gameCode)
-    if (!normalized) {
-      throw createRequestError('缺少游戏模块标识')
-    }
-
-    const gameConfig = Config.getGameConfig(normalized)
-    const apiKey = String(gameConfig?.[normalized]?.api_key || '').trim()
-    if (!apiKey) {
-      throw createRequestError(`游戏模块接口需要先在 config/config/games/${normalized}.yaml 中填写 ${normalized}.api_key`)
-    }
-    return apiKey
-  }
-
   getClientScopeParams () {
     const clientType = normalizeClientType(Config.get('wegame', 'client_type'))
     const clientId = String(Config.get('wegame', 'client_id') || '').trim()
@@ -193,14 +175,6 @@ export default class WeGameApi {
       params: {
         user_identifier: normalized,
         ...this.getClientScopeParams()
-      }
-    }
-  }
-
-  buildGameScopeOptions (gameCode = '') {
-    return {
-      headers: {
-        'X-API-Key': this.getGameApiKey(gameCode)
       }
     }
   }
@@ -287,15 +261,26 @@ export default class WeGameApi {
     })
   }
 
-  requestGameFrameworkGet (urlPath, frameworkToken, gameCode, params = undefined) {
-    const scoped = this.buildGameScopeOptions(gameCode)
-
+  requestGameFrameworkGet (urlPath, frameworkToken, _gameCode, params = undefined) {
     return this.request(urlPath, {
       method: 'get',
       params,
-      headers: {
-        ...this.buildFrameworkHeaders(frameworkToken),
-        ...(scoped.headers || {})
+      headers: this.buildFrameworkHeaders(frameworkToken),
+      needBaseAuth: true
+    })
+  }
+
+  requestUserScopedGet (urlPath, userIdentifier, params = {}) {
+    const scoped = this.buildUserScopeOptions(userIdentifier)
+    const scopedParams = isPlainObject(scoped.params) ? scoped.params : {}
+    const extraParams = isPlainObject(params) ? params : {}
+
+    return this.request(urlPath, {
+      method: 'get',
+      headers: scoped.headers,
+      params: {
+        ...scopedParams,
+        ...extraParams
       }
     })
   }

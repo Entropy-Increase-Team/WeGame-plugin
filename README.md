@@ -32,7 +32,7 @@ git clone https://github.com/Entropy-Increase-Team/WeGame-plugin.git ./plugins/W
 核心字段：
 
 - `wegame.base_url`：后端地址
-- `wegame.api_key`：WeGame 核心层 API Key，作用域必须是 `wegame`
+- `wegame.api_key`：开发者 WeGame API Key，作用域必须是 `wegame`
 - `wegame.client_type`：建议填 `bot`
 - `wegame.client_id`：机器人实例标识
 - `wegame.device_fingerprint`：设备指纹，可留空自动生成
@@ -42,6 +42,8 @@ git clone https://github.com/Entropy-Increase-Team/WeGame-plugin.git ./plugins/W
 - 首次载入插件时，如果 `config/config/wgconfig.yaml` 不存在，会自动从默认配置创建
 - 如果 `wegame.api_key` 留空，插件会自动尝试匿名令牌登录链路
 - 但账号列表、切换账号、删除账号这类账号管理功能需要 `wegame.api_key`
+- 游戏模块接口也使用同一把 `wegame.api_key`
+- 如果要访问需要授权的游戏接口，这把 Key 还需要提前获批对应游戏权限，例如 `game:rocom` 下的 `rocom.access`
 - 模块资源仓库地址不再走配置文件，已在代码中固定为 `https://github.com/Entropy-Increase-Team/WeGame-GameModules`
 
 ### 2. 游戏模块配置
@@ -53,8 +55,9 @@ git clone https://github.com/Entropy-Increase-Team/WeGame-plugin.git ./plugins/W
 
 说明：
 
-- 每个游戏模块都使用自己的 API Key
-- 不要把游戏模块 API Key 填到核心层 `wegame.api_key`
+- 游戏模块不再单独维护 API Key
+- `config/config/games/<module>.yaml` 仅保留模块自身业务配置
+- 实际请求仍统一使用核心层的 `wegame.api_key`
 - 模块首次读取配置时，如果用户配置不存在，会根据模块自己的默认配置自动生成
 
 ### 3. 帮助配置
