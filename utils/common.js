@@ -9,6 +9,13 @@ function getPlatformLabel (platform) {
   return platform === 'wechat' ? '微信' : 'QQ'
 }
 
+function normalizeCredentialProvider (value, fallback = '') {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized) return normalized
+  if (!fallback) return ''
+  return normalizeCredentialProvider(fallback, '')
+}
+
 function getLoginTypeLabel (loginType) {
   const value = String(loginType || '').trim().toLowerCase()
   if (value === 'qq') return 'QQ扫码'
@@ -86,6 +93,7 @@ export {
   getPlatformLabel,
   getStatusText,
   maskValue,
+  normalizeCredentialProvider,
   normalizeLoginStatus,
   normalizePlatform
 }

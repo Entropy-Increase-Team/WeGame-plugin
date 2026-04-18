@@ -1,4 +1,5 @@
 import Config from '../utils/config.js'
+import { normalizeCredentialProvider } from '../utils/common.js'
 import WeGameApi from './api.js'
 import { formatCommand } from '../utils/command.js'
 import {
@@ -25,6 +26,7 @@ function normalizeBinding (binding = {}) {
     frameworkToken,
     tokenType: String(binding.tokenType || binding.token_type || '').trim(),
     loginType: String(binding.loginType || binding.login_type || '').trim(),
+    credentialProvider: normalizeCredentialProvider(binding.credentialProvider || binding.credential_provider),
     clientType: String(binding.clientType || binding.client_type || '').trim(),
     tgpId: String(binding.tgpId || binding.tgp_id || '').trim(),
     roleId: String(binding.roleId || binding.role_id || '').trim(),
@@ -46,6 +48,7 @@ function bindingToCredential (binding) {
     tgpId: binding.tgpId,
     isValid: binding.isValid,
     loginType: binding.loginType,
+    credentialProvider: binding.credentialProvider,
     updatedAt: binding.updatedAt,
     role: {
       id: binding.roleId,
@@ -68,6 +71,7 @@ function mergeCredential (baseCredential, overrideCredential = {}) {
     isValid: overrideCredential?.isValid ?? base.isValid,
     isBind: overrideCredential?.isBind ?? base.isBind,
     loginType: overrideCredential?.loginType || base.loginType,
+    credentialProvider: overrideCredential?.credentialProvider || base.credentialProvider,
     updatedAt: overrideCredential?.updatedAt || base.updatedAt,
     role: {
       ...(base.role || {}),
@@ -81,8 +85,13 @@ function mergeCredential (baseCredential, overrideCredential = {}) {
 function isSameCredential (left = {}, right = {}) {
   const leftToken = String(left?.frameworkToken || '').trim()
   const rightToken = String(right?.frameworkToken || '').trim()
+  const leftProvider = normalizeCredentialProvider(left?.credentialProvider)
+  const rightProvider = normalizeCredentialProvider(right?.credentialProvider)
 
   if (leftToken && rightToken) {
+    if (leftProvider && rightProvider && leftProvider !== rightProvider) {
+      return false
+    }
     return leftToken === rightToken
   }
 
@@ -90,6 +99,9 @@ function isSameCredential (left = {}, right = {}) {
   const rightRoleId = String(right?.role?.id || '').trim()
 
   if (leftRoleId && rightRoleId) {
+    if (leftProvider && rightProvider && leftProvider !== rightProvider) {
+      return false
+    }
     return leftRoleId === rightRoleId
   }
 

@@ -27,6 +27,9 @@
 - 各游戏接口按游戏拆分为独立文档维护
 - 核心链路以 PostgreSQL 为主存储，Redis 提供缓存与令牌辅助能力
 
+当前仓库已经同时注册 `rocom` 和 `df` 两个共享登录 provider。默认配置仍然固定到 `rocom` 以兼容旧行为；如果你准备把共享登录拿来配合 `df` 业务使用，建议显式传 `provider=df`，或者把 `WEGAME_CREDENTIAL_PROVIDER` / `wegame.credential_provider` 改成 `df`。
+各游戏模块现在也会校验 `frameworkToken` 已持久化的 `credentialProvider`；如果 token 已明确归属 `rocom` 或 `df`，就不能再混用到另一个游戏接口上。
+
 ### 响应格式
 
 除少数特殊场景外，当前接口统一返回：
@@ -196,6 +199,7 @@
 - `user_identifier=<你的用户标识>`
 - `client_type=bot|app|web`
 - `client_id=<客户端标识>`
+- `provider=<provider-name>`，可选；当前仓库默认值是 `rocom`，如果你要按 DF 规则校验请显式传 `provider=df`
 
 说明：
 
@@ -212,6 +216,7 @@
   "message": "成功",
   "data": {
     "frameworkToken": "a6f8c28d-92b2-4ddd-a115-d9271e224c9a",
+    "credentialProvider": "rocom",
     "qr_image": "data:image/png;base64,...",
     "expire": 1775397796817,
     "auto_bind": false
@@ -262,6 +267,7 @@
 - `user_identifier=<你的用户标识>`
 - `client_type=bot|app|web`
 - `client_id=<客户端标识>`
+- `provider=<provider-name>`，可选；当前仓库默认值是 `rocom`，如果你要按 DF 规则校验请显式传 `provider=df`
 
 说明：
 
@@ -278,6 +284,7 @@
   "message": "成功",
   "data": {
     "frameworkToken": "9750e586-63ca-44bc-a2a8-2ebe28a3c9de",
+    "credentialProvider": "rocom",
     "qr_image": "https://open.weixin.qq.com/connect/qrcode/061O0MK84NZHFa1b",
     "expire": 1775397815642,
     "auto_bind": false
@@ -328,6 +335,7 @@
 {
   "tgp_id": "295231685",
   "tgp_ticket": "your_ticket_here",
+  "provider": "rocom",
   "user_identifier": "2621529331",
   "client_type": "bot",
   "client_id": "yunzai"
@@ -337,6 +345,7 @@
 说明：
 
 - `user_identifier / client_type / client_id` 仅第三方客户端自动绑定时需要
+- `provider` 不传时会走当前默认 provider；当前模板默认是 `rocom`
 - 如果第三方导入凭证时传了 `user_identifier`，后端会自动创建或更新账号绑定
 - 如果登录时没传 `user_identifier`，后续仍可单独调用 `POST /api/v1/user/bindings` 绑定
 - 导入得到的这份 `frameworkToken` 同样会绑定当前调用身份，后续查询 / 刷新 / 删除都要用同一身份
@@ -344,6 +353,7 @@
 返回核心字段：
 
 - `frameworkToken`
+- `credentialProvider`
 - `tgpId`
 - `isValid`
 - `loginType`
@@ -363,6 +373,7 @@
   "message": "成功",
   "data": {
     "frameworkToken": "4c52b50d-2b5f-47fb-9a1f-8b0c76f76c67",
+    "credentialProvider": "rocom",
     "tgpId": "295231685",
     "isValid": true,
     "loginType": "manual",
@@ -399,6 +410,7 @@
   "message": "成功",
   "data": {
     "frameworkToken": "4c52b50d-2b5f-47fb-9a1f-8b0c76f76c67",
+    "credentialProvider": "rocom",
     "tgpId": "295231685",
     "isValid": true,
     "isBind": false,
@@ -425,6 +437,7 @@
   "message": "成功",
   "data": {
     "frameworkToken": "9750e586-63ca-44bc-a2a8-2ebe28a3c9de",
+    "credentialProvider": "rocom",
     "tgpId": "295231685",
     "isValid": true,
     "isBind": false,
@@ -451,6 +464,7 @@
 - `WeGame 微信扫码` 当前也不支持同类刷新
 - 原因是现有微信链路只拿到一次性的 `wxCode -> tgp_ticket` 结果，没有可持续复用的 refresh 凭据
 - 刷新前会先校验当前身份是否有权管理这份 `frameworkToken`
+- 如果是旧 token 且库里还没持久化 provider，可选传 `provider=<provider-name>` 帮服务补齐
 
 响应示例：
 
@@ -462,6 +476,7 @@
     "success": true,
     "message": "刷新成功",
     "frameworkToken": "4c52b50d-2b5f-47fb-9a1f-8b0c76f76c67",
+    "credentialProvider": "rocom",
     "tgpId": "295231685",
     "loginType": "qq",
     "expireAt": 1775419200000
@@ -528,6 +543,7 @@
 - 返回当前用户已绑定的全部 WeGame 账号
 - `is_primary=true` 表示当前默认账号
 - `is_valid=false` 表示当前绑定凭证已失效
+- `credential_provider` 表示这条绑定当前归属的共享 WeGame provider，例如 `rocom`、`df`
 - 如果需要当前用户在某个游戏下的账号列表，请使用对应游戏组件的 `accounts` 接口
 - 共享绑定接口默认只返回 WeGame 层信息，不区分具体游戏角色资料
 - 例如 RoCom 账号列表用 `GET /api/v1/games/rocom/accounts`
@@ -550,6 +566,7 @@
         "framework_token": "4c52b50d-2b5f-47fb-9a1f-8b0c76f76c67",
         "token_type": "wegame",
         "login_type": "qq",
+        "credential_provider": "rocom",
         "client_type": "web",
         "tgp_id": "295231685",
         "is_primary": true,
@@ -562,6 +579,7 @@
         "framework_token": "9750e586-63ca-44bc-a2a8-2ebe28a3c9de",
         "token_type": "wegame",
         "login_type": "wechat",
+        "credential_provider": "df",
         "client_type": "web",
         "tgp_id": "295231999",
         "is_primary": false,
@@ -595,7 +613,9 @@
 - Web 用户可直接带 `Authorization: Bearer <web-jwt>` 调用
 - 第三方客户端需要带 `X-API-Key: <wegame-api-key>`，并提供 `user_identifier`
 - `client_type` 仅允许 `web`、`bot`、`app`
-- 如果该 `frameworkToken` 已存在绑定，则会更新原绑定并返回 `200`
+- 只能绑定当前身份自己创建 / 拥有的 `frameworkToken`；不能把别人的 token 直接抢绑定到自己名下
+- 绑定会按 `credential_provider` 区分；同一个 WeGame 账号可以分别保留 `rocom` / `df` 两条绑定
+- 如果该 `frameworkToken` 已存在于当前用户作用域下，则会更新原绑定并返回 `200`
 - 如果是新绑定，则返回 `201`
 
 响应示例：
@@ -610,6 +630,7 @@
       "framework_token": "4c52b50d-2b5f-47fb-9a1f-8b0c76f76c67",
       "token_type": "wegame",
       "login_type": "manual",
+      "credential_provider": "rocom",
       "client_type": "bot",
       "tgp_id": "295231685",
       "is_primary": true,

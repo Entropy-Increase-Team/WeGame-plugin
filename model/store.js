@@ -1,3 +1,5 @@
+import { normalizeCredentialProvider } from '../utils/common.js'
+
 const USER_REDIS_KEY = (userId) => `WEGAME:USER:${userId}`
 
 function normalizeRedisToken (value = '') {
@@ -112,6 +114,11 @@ function normalizeCredential (platformOrPayload = {}, maybePayload) {
     isValid: payload.isValid !== false && payload.is_valid !== false,
     isBind: payload.isBind !== undefined ? Boolean(payload.isBind) : payload.is_bind !== undefined ? Boolean(payload.is_bind) : true,
     updatedAt: payload.updatedAt ? String(payload.updatedAt) : payload.updated_at ? String(payload.updated_at) : new Date().toISOString()
+  }
+
+  const credentialProvider = normalizeCredentialProvider(payload.credentialProvider || payload.credential_provider)
+  if (credentialProvider) {
+    normalized.credentialProvider = credentialProvider
   }
 
   const tgpId = payload.tgpId ? String(payload.tgpId) : payload.tgp_id ? String(payload.tgp_id) : ''
