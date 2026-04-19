@@ -182,6 +182,13 @@
 - 匿名身份创建的凭证，只能由同一匿名指纹继续轮询和管理
 - 具体游戏数据接口仍然是“拿到 `frameworkToken` 就能访问对应游戏能力”；这里的 owner 约束只针对登录管理接口
 
+第三方客户端补充约定：
+
+- `user_identifier` 可放在 query 参数或 `X-User-Identifier` 请求头
+- `client_type` 可放在 query 参数 / 请求体，或 `X-Client-Type` 请求头
+- `client_id` 可放在 query 参数 / 请求体，或 `X-Client-ID` 请求头
+- 对于 `status` / `token` / `refresh` / `delete` 这类无请求体的管理接口，如果该 `frameworkToken` 创建时绑定了 `user_identifier`，后续请求也要继续带同一个 `user_identifier`（query 或 `X-User-Identifier`）
+
 推荐接入流程：
 
 1. `POST /api/v1/auth/anonymous-token`
@@ -194,11 +201,11 @@
 
 `GET /api/v1/login/wegame/qr`
 
-第三方客户端可选参数：
+第三方客户端可选参数 / 请求头：
 
-- `user_identifier=<你的用户标识>`
-- `client_type=bot|app|web`
-- `client_id=<客户端标识>`
+- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
+- `client_type=bot|app|web`，或 `X-Client-Type: bot|app|web`
+- `client_id=<客户端标识>`，或 `X-Client-ID: <客户端标识>`
 - `provider=<provider-name>`，可选；当前仓库默认值是 `rocom`，如果你要按 DF 规则校验请显式传 `provider=df`
 
 说明：
@@ -232,6 +239,10 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
+第三方客户端补充说明：
+
+- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建的，轮询时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+
 响应示例：
 
 ```json
@@ -262,11 +273,11 @@
 
 `GET /api/v1/login/wegame/wechat/qr`
 
-第三方客户端可选参数：
+第三方客户端可选参数 / 请求头：
 
-- `user_identifier=<你的用户标识>`
-- `client_type=bot|app|web`
-- `client_id=<客户端标识>`
+- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
+- `client_type=bot|app|web`，或 `X-Client-Type: bot|app|web`
+- `client_id=<客户端标识>`，或 `X-Client-ID: <客户端标识>`
 - `provider=<provider-name>`，可选；当前仓库默认值是 `rocom`，如果你要按 DF 规则校验请显式传 `provider=df`
 
 说明：
@@ -299,6 +310,10 @@
 请求头：
 
 - `X-Framework-Token: <frameworkToken>`
+
+第三方客户端补充说明：
+
+- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建的，轮询时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
 
 响应示例：
 
@@ -345,6 +360,7 @@
 说明：
 
 - `user_identifier / client_type / client_id` 仅第三方客户端自动绑定时需要
+- 这三个字段既可以放在请求体里，也可以分别通过 `X-User-Identifier`、`X-Client-Type`、`X-Client-ID` 请求头或 query 参数提供
 - `provider` 不传时会走当前默认 provider；当前模板默认是 `rocom`
 - 如果第三方导入凭证时传了 `user_identifier`，后端会自动创建或更新账号绑定
 - 如果登录时没传 `user_identifier`，后续仍可单独调用 `POST /api/v1/user/bindings` 绑定
@@ -402,6 +418,10 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
+第三方客户端补充说明：
+
+- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建 / 导入的，查询时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+
 响应示例：
 
 ```json
@@ -429,6 +449,10 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
+第三方客户端补充说明：
+
+- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建 / 导入的，查询时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+
 响应示例：
 
 ```json
@@ -455,6 +479,10 @@
 请求头：
 
 - `X-Framework-Token: <frameworkToken>`
+
+第三方客户端补充说明：
+
+- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建 / 导入的，刷新时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
 
 说明：
 
@@ -492,6 +520,10 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
+第三方客户端补充说明：
+
+- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建 / 导入的，删除时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+
 说明：
 
 - 删除前会先校验当前身份是否有权管理这份 `frameworkToken`
@@ -527,16 +559,18 @@
 第三方客户端说明：
 
 - `user_identifier` 可放在 query 参数或 `X-User-Identifier` 请求头
+- `client_type` 可放在 query 参数 / 请求体，或 `X-Client-Type` 请求头
+- `client_id` 可放在 query 参数 / 请求体，或 `X-Client-ID` 请求头
 - 第三方客户端这里统一使用开发者 `WeGame API Key`
-- 这三类接口都会按当前用户作用域操作，不会串账号
+- 这些接口都会按当前用户作用域操作，不会串账号
 
 ### 账号列表
 
 `GET /api/v1/user/bindings`
 
-第三方客户端额外参数：
+第三方客户端额外参数 / 请求头：
 
-- `user_identifier=<你的用户标识>`
+- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
 
 说明：
 
@@ -612,6 +646,7 @@
 - 用于把一份已保存的 `frameworkToken` 手动绑定到当前用户
 - Web 用户可直接带 `Authorization: Bearer <web-jwt>` 调用
 - 第三方客户端需要带 `X-API-Key: <wegame-api-key>`，并提供 `user_identifier`
+- 第三方客户端也可以通过请求体、query 参数或 `X-Client-Type` / `X-Client-ID` 请求头补充 `client_type` / `client_id`
 - `client_type` 仅允许 `web`、`bot`、`app`
 - 只能绑定当前身份自己创建 / 拥有的 `frameworkToken`；不能把别人的 token 直接抢绑定到自己名下
 - 绑定会按 `credential_provider` 区分；同一个 WeGame 账号可以分别保留 `rocom` / `df` 两条绑定
@@ -647,9 +682,9 @@
 
 `POST /api/v1/user/bindings/:id/primary`
 
-第三方客户端额外参数：
+第三方客户端额外参数 / 请求头：
 
-- `user_identifier=<你的用户标识>`
+- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
 
 说明：
 
@@ -673,9 +708,9 @@
 
 `POST /api/v1/user/bindings/:id/refresh`
 
-第三方客户端额外参数：
+第三方客户端额外参数 / 请求头：
 
-- `user_identifier=<你的用户标识>`
+- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
 
 说明：
 
@@ -702,9 +737,9 @@
 
 `DELETE /api/v1/user/bindings/:id`
 
-第三方客户端额外参数：
+第三方客户端额外参数 / 请求头：
 
-- `user_identifier=<你的用户标识>`
+- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
 
 说明：
 
