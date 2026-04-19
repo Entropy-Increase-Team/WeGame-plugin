@@ -113,7 +113,10 @@ export class WeGameLogin extends plugin {
     msg.push(
       `请使用${platformLabel}扫描下方二维码完成 WeGame 登录。`,
       `\n二维码过期时间：${expireText}`,
-      '\n登录成功后会自动同步到账号绑定列表。'
+      '\n登录成功后会自动同步到账号绑定列表。',
+      '\n\n【免责声明】',
+      '\n您将通过扫码授权本插件后端服务器获取您的游戏数据。',
+      '\n扫码仅用于获取WeGame数据，不涉及登录游戏，如果出现盗号等问题与我方完全无关。'
     )
 
     if (segmentData) {
