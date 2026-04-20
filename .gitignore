@@ -5,3 +5,4 @@
 
 /modules/*
 !/modules/.keep
+.DS_Store

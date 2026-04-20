@@ -2,6 +2,26 @@ import path from 'node:path'
 import puppeteer from '../../../lib/puppeteer/puppeteer.js'
 import { pluginName, pluginRoot } from './path.js'
 
+let _patched = false
+async function patchPuppeteer () {
+  if (_patched) return
+  _patched = true
+  const origInit = puppeteer.browserInit.bind(puppeteer)
+  puppeteer.browserInit = async function () {
+    const browser = await origInit()
+    if (browser && !browser._dsfPatched) {
+      browser._dsfPatched = true
+      const OrigNewPage = browser.newPage.bind(browser)
+      browser.newPage = async function () {
+        const page = await OrigNewPage()
+        await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 2 })
+        return page
+      }
+    }
+    return browser
+  }
+}
+
 function normalizeRenderPath (value = '') {
   return String(value || '')
     .replace(/\.html$/i, '')
@@ -37,7 +57,7 @@ async function renderModuleTemplate (e, moduleCode, renderPath, data = {}, cfg =
 
   let renderData = {
     sys: {
-      scale: 1
+      scale: 2.5
     },
     _res_path: moduleResPath,
     _plugin_res_path: pluginResPath,
@@ -56,7 +76,13 @@ async function renderModuleTemplate (e, moduleCode, renderPath, data = {}, cfg =
     renderData = cfg.beforeRender({ data: renderData }) || renderData
   }
 
-  const image = await puppeteer.screenshot(`${pluginName}/${htmlPath}`, renderData)
+  await patchPuppeteer()
+  const image = await puppeteer.screenshot(`${pluginName}/${htmlPath}`, {
+    ...renderData,
+    quality: 100,
+    zoom:2,
+    type: 'png'
+  })
 
   if (cfg.retType === 'base64') {
     return image
