@@ -1,0 +1,93 @@
+name: 🐛 Bug 报告
+description: 报告 WeGame 核心插件、前后端与统一能力相关 Bug
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本仓库是 **Yunzai 上的 WeGame 核心层**：扫码/账号、模块发现与下载、统一请求与帮助聚合等，**前后端与协议相关问题也在这里反馈**。
+
+        若问题属于**某一游戏在 GameModules 仓库某分支**下的数据、资源或模块内实现，请到 **[WeGame-GameModules 提交](https://github.com/Entropy-Increase-Team/WeGame-GameModules/issues/new/choose)**，并注明 **游戏模块(对应分支)**（例如 [洛克王国：世界 `rocom` 分支](https://github.com/Entropy-Increase-Team/WeGame-GameModules/tree/rocom)）。
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 问题范围
+      description: 选「游戏模块 / 某分支内」时，更建议到上方 GameModules
+      options:
+        - 核心/前后端/登录/绑定/统一 API/配置
+        - 模块下载/更新/发现/帮助聚合
+        - 我判断是某游戏模块分支内（更建议 GameModules + 标明分支名）
+        - 其他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: bug-type
+    attributes:
+      label: 表现类型
+      options:
+        - 前端或交互（如界面/命令回显/流程）
+        - 后端/接口/请求异常
+        - 模块加载或版本问题
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图或日志
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: 插件与依赖版本
+      placeholder: "WeGame-plugin、Yunzai、Node 等"
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: 运行环境
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+    validations:
+      required: false

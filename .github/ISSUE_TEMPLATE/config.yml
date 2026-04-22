@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 游戏模块问题（请标明分支，如 rocom）
+    url: https://github.com/Entropy-Increase-Team/WeGame-GameModules/issues/new/choose
+    about: 具体某游戏在 GameModules 仓库独立分支上维护。玩法数据、模块内逻辑、某分支资源等请在此提交，并注明游戏模块(对应分支)
+  - name: QQ 交流群
+    url: https://qm.qq.com/q/VDBFadHGwA
+    about: 群号 1097809141

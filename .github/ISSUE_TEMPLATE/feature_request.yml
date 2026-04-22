@@ -1,0 +1,62 @@
+name: 💡 功能建议
+description: 对 WeGame 核心与统一能力提建议
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **全框架/统一 WeGame 能力、前后端、登录、模块市场与帮助** 相关建议可在此提出。
+
+        **只针对某游戏、且落在 GameModules 某分支** 下的内容，请到 [WeGame-GameModules](https://github.com/Entropy-Increase-Team/WeGame-GameModules/issues) 开 Issue，**标题中写明游戏模块(对应分支)**，如 `rocom`。
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 建议范围
+      options:
+        - 核心/统一能力/前后端/体验
+        - 更偏某游戏模块/分支内（更建议到 GameModules 并标分支）
+        - 仅讨论/其他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: suggestion-type
+    attributes:
+      label: 建议类型
+      options:
+        - 新能力或流程
+        - 现有能力改进
+        - 文档与说明
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 背景与需求
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 希望实现的效果
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 可替代方案
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+    validations:
+      required: false
