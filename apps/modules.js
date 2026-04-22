@@ -110,6 +110,7 @@ export class WeGameModules extends plugin {
 
     lines.push('')
     lines.push(`下载命令：${formatCommand('模块下载 <模块名>')}`)
+    lines.push(`更新命令：${formatCommand('模块更新 [模块名]')}`)
 
     return lines.join('\n')
   }

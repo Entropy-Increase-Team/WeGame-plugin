@@ -111,7 +111,7 @@ export class WeGameLogin extends plugin {
     }
 
     msg.push(
-      `请使用${platformLabel}扫描下方二维码完成 WeGame 登录。`,
+      `请使用另外一台设备的${platformLabel}扫描下方二维码完成 WeGame 登录。`,
       `\n二维码过期时间：${expireText}`,
       '\n登录成功后会自动同步到账号绑定列表。',
       '\n\n【免责声明】',
