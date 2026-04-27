@@ -44,11 +44,6 @@
       <div class="commands-grid" style="grid-template-columns:repeat({{colCount}}, {{colWidth}}px); gap: {{widthGap}}px;">
         {{each $value.list}}
         <article class="command-item">
-          {{if $value.iconPath}}
-          <div class="help-item-icon">
-            <img src="{{_res_path}}{{$value.iconPath}}" alt="">
-          </div>
-          {{/if}}
           <div class="text-content">
             <div class="command-name">{{$value.title}}</div>
             <div class="command-description">{{$value.desc}}</div>

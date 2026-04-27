@@ -24,7 +24,6 @@ function normalizeHelpGroups (groups = []) {
       ...group,
       group: applyPlaceholders(group?.group || ''),
       list: (Array.isArray(group?.list) ? group.list : []).map((item) => ({
-        iconPath: String(item?.icon || item?.iconPath || '').trim(),
         title: applyPlaceholders(item?.title || ''),
         desc: applyPlaceholders(item?.desc || '')
       }))
@@ -36,7 +35,6 @@ function buildModuleEntryGroups (groupTitle = '游戏模块') {
   const normalizedGroupTitle = applyPlaceholders(groupTitle).trim() || '游戏模块'
   const moduleItems = ModuleService.getHelpItems()
     .map((item) => ({
-      iconPath: String(item?.iconPath || '').trim(),
       title: applyPlaceholders(item?.title || ''),
       desc: applyPlaceholders(item?.desc || '')
     }))
@@ -92,6 +90,21 @@ function buildFallbackText (helpCfg = {}, helpGroup = []) {
   return lines.join('\n')
 }
 
+function buildInstalledModuleHint () {
+  const moduleItems = ModuleService.getHelpItems()
+  const lines = [
+    '已安装游戏组件，请使用对应组件帮助：'
+  ]
+
+  for (const item of moduleItems) {
+    const title = applyPlaceholders(item?.title || '')
+    const desc = applyPlaceholders(item?.desc || '')
+    lines.push(desc ? `${title} - ${desc}` : title)
+  }
+
+  return lines.filter(Boolean).join('\n')
+}
+
 export class WeGameHelp extends plugin {
   constructor (e) {
     super({
@@ -111,6 +124,11 @@ export class WeGameHelp extends plugin {
   }
 
   async showHelp () {
+    if (ModuleService.getInstalledModules().length > 0) {
+      await this.reply(buildInstalledModuleHint())
+      return true
+    }
+
     const helpSetting = getHelpConfig()
     const helpCfg = {
       title: applyPlaceholders(helpSetting?.help_title || 'WeGame 帮助'),

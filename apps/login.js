@@ -1,5 +1,6 @@
 import common from '../../../lib/common/common.js'
 import Config from '../utils/config.js'
+import ModuleService from '../model/moduleService.js'
 import WeGameAccountService from '../model/accountService.js'
 import WeGameApi from '../model/api.js'
 import { normalizeCredential } from '../model/store.js'
@@ -12,9 +13,63 @@ import {
   normalizeLoginStatus,
   normalizePlatform
 } from '../utils/common.js'
-import { buildCommandReg, formatCommand, stripCommandPrefix } from '../utils/command.js'
+import {
+  COMMAND_PREFIXES,
+  DEFAULT_COMMAND_PREFIX,
+  formatCommand,
+  stripCommandPrefix
+} from '../utils/command.js'
 
-const LOGIN_COMMAND_REG = buildCommandReg('(微信|wx|WX|QQ|qq)(登陆|登录)')
+function escapeRegExp (value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function buildPrefixPattern (prefixes = []) {
+  const values = [...new Set((Array.isArray(prefixes) ? prefixes : [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+  )]
+
+  return values.length > 0
+    ? `(?:${values.map((item) => escapeRegExp(item)).join('|')})`
+    : '(?!)'
+}
+
+function getModuleCommandPrefixes () {
+  return ModuleService
+    .getInstalledModuleCommandPrefixes()
+    .filter((item) => !COMMAND_PREFIXES.includes(item))
+}
+
+function buildLoginCommandReg () {
+  return `^${buildPrefixPattern([...COMMAND_PREFIXES, ...getModuleCommandPrefixes()])}\\s*(微信|wx|WX|QQ|qq)(登陆|登录)$`
+}
+
+function buildWeGameNamespacedReg (bodyPattern = '') {
+  const corePattern = buildPrefixPattern(COMMAND_PREFIXES)
+  const modulePattern = buildPrefixPattern(getModuleCommandPrefixes())
+  return `^(?:(?:${corePattern}\\s*(?:wg\\s*)?${bodyPattern})|(?:${modulePattern}\\s*wg\\s*${bodyPattern}))$`
+}
+
+function stripWeGameCommandPrefix (message = '', commandLiteral = '') {
+  const text = String(message || '').trim()
+  const command = escapeRegExp(commandLiteral)
+  const patterns = [
+    new RegExp(`^${buildPrefixPattern(COMMAND_PREFIXES)}\\s*(?:wg\\s*)?${command}(?:\\s+|$)`),
+    new RegExp(`^${buildPrefixPattern(getModuleCommandPrefixes())}\\s*wg\\s*${command}(?:\\s+|$)`)
+  ]
+
+  for (const pattern of patterns) {
+    const matched = text.match(pattern)
+    if (matched) {
+      return text.slice(matched[0].length).trim()
+    }
+  }
+
+  return ''
+}
+
+const LOGIN_COMMAND_REG = buildLoginCommandReg()
 const ACTIVE_LOGIN_SESSIONS = new Map()
 const RECENT_LOGIN_NOTICES = new Map()
 const LOGIN_NOTICE_DEDUP_MS = 8000
@@ -32,15 +87,15 @@ export class WeGameLogin extends plugin {
           fnc: 'login'
         },
         {
-          reg: buildCommandReg('账号列表'),
+          reg: buildWeGameNamespacedReg('账号列表'),
           fnc: 'listAccounts'
         },
         {
-          reg: buildCommandReg('切换账号(?:\\s+.+)?'),
+          reg: buildWeGameNamespacedReg('切换账号(?:\\s+.+)?'),
           fnc: 'switchAccount'
         },
         {
-          reg: buildCommandReg('删除账号(?:\\s+.+)?'),
+          reg: buildWeGameNamespacedReg('删除账号(?:\\s+.+)?'),
           fnc: 'deleteAccount'
         }
       ]
@@ -51,6 +106,28 @@ export class WeGameLogin extends plugin {
     this.accountService = new WeGameAccountService(e)
     this.recalledMessageIds = new Set()
     this.loginReplyMessageIds = new Set()
+  }
+
+  getActiveCommandPrefix () {
+    const text = String(this.e?.msg || '').trim()
+    const prefixes = [...getModuleCommandPrefixes(), ...COMMAND_PREFIXES]
+      .sort((left, right) => right.length - left.length)
+
+    return prefixes.find((prefix) => text.startsWith(prefix)) || DEFAULT_COMMAND_PREFIX
+  }
+
+  isModulePrefixedCommand () {
+    return getModuleCommandPrefixes().includes(this.getActiveCommandPrefix())
+  }
+
+  formatWeGameCommand (command = '', options = {}) {
+    const text = String(command || '').trim()
+    if (!this.isModulePrefixedCommand()) {
+      return formatCommand(text)
+    }
+
+    const namespace = options.namespaced ? 'wg' : ''
+    return `${this.getActiveCommandPrefix()}${namespace}${text}`
   }
 
   async login () {
@@ -235,7 +312,7 @@ export class WeGameLogin extends plugin {
     try {
       const bindings = await this.accountService.listBindings()
       if (bindings.length === 0) {
-        await this.reply(`当前还没有已绑定的 WeGame 账号，请先发送 ${formatCommand('qq登陆')} 或 ${formatCommand('wx登陆')}`)
+        await this.reply(`当前还没有已绑定的 WeGame 账号，请先发送 ${this.formatWeGameCommand('qq登陆')} 或 ${this.formatWeGameCommand('wx登陆')}`)
         return true
       }
 
@@ -254,7 +331,7 @@ export class WeGameLogin extends plugin {
     try {
       const bindings = await this.accountService.listBindings()
       if (bindings.length === 0) {
-        throw new Error(`当前还没有已绑定的 WeGame 账号，请先发送 ${formatCommand('qq登陆')} 或 ${formatCommand('wx登陆')}`)
+        throw new Error(`当前还没有已绑定的 WeGame 账号，请先发送 ${this.formatWeGameCommand('qq登陆')} 或 ${this.formatWeGameCommand('wx登陆')}`)
       }
 
       const target = this.resolveBindingTarget(bindings, this.extractBindingTargetArg('切换'))
@@ -313,9 +390,9 @@ export class WeGameLogin extends plugin {
   }
 
   extractBindingTargetArg (action = '切换') {
-    const raw = stripCommandPrefix(this.e.msg, `${action}账号`)
+    const raw = stripWeGameCommandPrefix(this.e.msg, `${action}账号`) || stripCommandPrefix(this.e.msg, `${action}账号`)
     if (!raw) {
-      throw new Error(`格式：${formatCommand(`${action}账号 <序号>`)}`)
+      throw new Error(`格式：${this.formatWeGameCommand(`${action}账号 <序号>`, { namespaced: true })}`)
     }
     return raw
   }
@@ -327,7 +404,7 @@ export class WeGameLogin extends plugin {
     }
 
     if (!/^\d+$/.test(normalized)) {
-      throw new Error(`账号序号格式不正确，请先发送 ${formatCommand('账号列表')} 查看序号`)
+      throw new Error(`账号序号格式不正确，请先发送 ${this.formatWeGameCommand('账号列表', { namespaced: true })} 查看序号`)
     }
 
     const index = Number(normalized)
@@ -335,7 +412,7 @@ export class WeGameLogin extends plugin {
       return bindings[index - 1]
     }
 
-    throw new Error(`未找到对应账号，请先发送 ${formatCommand('账号列表')} 查看序号`)
+    throw new Error(`未找到对应账号，请先发送 ${this.formatWeGameCommand('账号列表', { namespaced: true })} 查看序号`)
   }
 
   getBindingName (binding = {}) {
@@ -376,8 +453,8 @@ export class WeGameLogin extends plugin {
     if (index === total - 1) {
       lines.push('')
       lines.push('说明：这里只展示 WeGame 绑定信息，具体游戏角色资料请使用对应游戏模块查询。')
-      lines.push(`切换：${formatCommand('切换账号 <序号>')}`)
-      lines.push(`删除：${formatCommand('删除账号 <序号>')}`)
+      lines.push(`切换：${this.formatWeGameCommand('切换账号 <序号>', { namespaced: true })}`)
+      lines.push(`删除：${this.formatWeGameCommand('删除账号 <序号>', { namespaced: true })}`)
     }
 
     return lines.join('\n')
@@ -412,7 +489,7 @@ export class WeGameLogin extends plugin {
     }
 
     if (String(Config.get('wegame', 'api_key') || '').trim()) {
-      lines.push(`可发送 ${formatCommand('账号列表')} 查看已绑定账号。`)
+      lines.push(`可发送 ${this.formatWeGameCommand('账号列表', { namespaced: true })} 查看已绑定账号。`)
     } else {
       lines.push('如需账号列表与切换账号，请先在 wgconfig.yaml 中填写 wegame.api_key。')
     }

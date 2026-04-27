@@ -56,10 +56,10 @@ function normalizeModuleMeta (payload = {}, moduleCode = '') {
     description: String(payload.description || '').trim(),
     version: String(payload.version || '0.0.0').trim(),
     apiDoc: String(payload.apiDoc || '').trim(),
+    commandPrefixes: Array.isArray(payload.commandPrefixes) ? payload.commandPrefixes.map((item) => String(item).trim()).filter(Boolean) : [],
     commands: Array.isArray(payload.commands) ? payload.commands.map((item) => String(item).trim()).filter(Boolean) : [],
     help: payload.help && typeof payload.help === 'object'
       ? {
-          icon: String(payload.help.icon || '').trim(),
           title: String(payload.help.title || '').trim(),
           desc: String(payload.help.desc || '').trim()
         }
@@ -311,6 +311,14 @@ class ModuleService {
       }))
   }
 
+  getInstalledModuleCommandPrefixes () {
+    return [...new Set(this.getInstalledModules()
+      .flatMap((item) => item.commandPrefixes || [])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+    )]
+  }
+
   async downloadModule (moduleCode = '') {
     const normalized = normalizeModuleCode(moduleCode)
     if (!normalized) {
@@ -387,10 +395,8 @@ class ModuleService {
         const help = moduleItem.help || {}
         const title = help.title || moduleItem.commands.find((item) => /(帮助|help)/i.test(item)) || `${moduleItem.name}帮助`
         const desc = help.desc || `${moduleItem.name}帮助`
-        const iconPath = help.icon || `../modules/${moduleItem.code}/resources/img/logo.png`
 
         return {
-          iconPath,
           title,
           desc
         }

@@ -148,28 +148,6 @@ body {
   background: var(--panel);
 }
 
-.help-item-icon {
-  width: 64px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 10px;
-  background: #111827;
-  border: 1px solid #1f2937;
-  padding: 7px 8px;
-  flex-shrink: 0;
-}
-
-.help-item-icon img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: contain;
-  object-position: center;
-}
-
 .text-content {
   flex: 1;
   min-width: 0;
