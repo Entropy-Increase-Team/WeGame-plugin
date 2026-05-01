@@ -1,6 +1,6 @@
 {
   "name": "wegame-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "基于 Yunzai 的 WeGame 平台插件，支持核心登录能力与可扩展游戏模块",
   "type": "module",
   "module": "index.js",

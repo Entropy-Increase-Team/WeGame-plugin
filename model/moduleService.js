@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import axios from 'axios'
 import { pluginRoot } from './path.js'
+import { formatCommand } from '../utils/command.js'
 
 const modulesRoot = path.join(pluginRoot, 'modules')
 const MODULE_REPOSITORY_URL = 'https://github.com/Entropy-Increase-Team/WeGame-GameModules'
@@ -349,7 +350,7 @@ class ModuleService {
     const remoteModules = await this.getRemoteModules()
     const existsRemote = remoteModules.some((item) => item.code === normalized)
     if (!existsRemote) {
-      throw new Error(`未找到模块「${normalized}」，请先发送 =模块 查看可下载模块列表`)
+      throw new Error(`未找到模块「${normalized}」，请先发送 ${formatCommand('模块')} 查看可下载模块列表`)
     }
 
     if (fs.existsSync(targetDir)) {
@@ -393,7 +394,8 @@ class ModuleService {
     return this.getInstalledModules()
       .map((moduleItem) => {
         const help = moduleItem.help || {}
-        const title = help.title || moduleItem.commands.find((item) => /(帮助|help)/i.test(item)) || `${moduleItem.name}帮助`
+        const prefix = moduleItem.commandPrefixes?.[0] || ''
+        const title = help.title || moduleItem.commands.find((item) => /(帮助|help)/i.test(item)) || (prefix ? `${prefix}帮助` : `${moduleItem.name}帮助`)
         const desc = help.desc || `${moduleItem.name}帮助`
 
         return {

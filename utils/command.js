@@ -1,5 +1,5 @@
-const COMMAND_PREFIXES = ['=']
-const DEFAULT_COMMAND_PREFIX = '='
+const COMMAND_PREFIXES = ['#wg']
+const DEFAULT_COMMAND_PREFIX = '#wg'
 
 function escapeRegExp (value = '') {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
