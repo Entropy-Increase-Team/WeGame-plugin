@@ -6,3 +6,5 @@
 /modules/*
 !/modules/.keep
 .DS_Store
+
+node_modules

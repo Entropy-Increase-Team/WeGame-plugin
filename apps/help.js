@@ -91,16 +91,12 @@ function buildFallbackText (helpCfg = {}, helpGroup = []) {
 }
 
 function buildInstalledModuleHint () {
-  const moduleItems = ModuleService.getHelpItems()
   const lines = [
-    '已安装游戏组件，请使用对应组件帮助：'
+    '已安装游戏组件，常用核心命令：',
+    '`#wg更新` - 更新 WeGame 核心插件与全部已安装模块',
+    '`#wg更新 [模块名]` - 仅更新指定模块',
+    '更多帮助请查看 +帮助'
   ]
-
-  for (const item of moduleItems) {
-    const title = applyPlaceholders(item?.title || '')
-    const desc = applyPlaceholders(item?.desc || '')
-    lines.push(desc ? `${title} - ${desc}` : title)
-  }
 
   return lines.filter(Boolean).join('\n')
 }
