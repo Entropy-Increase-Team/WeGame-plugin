@@ -74,6 +74,10 @@ const ACTIVE_LOGIN_SESSIONS = new Map()
 const RECENT_LOGIN_NOTICES = new Map()
 const LOGIN_NOTICE_DEDUP_MS = 8000
 
+function hasWeGameApiKey () {
+  return Boolean(String(Config.get('wegame', 'api_key') || '').trim())
+}
+
 export class WeGameLogin extends plugin {
   constructor (e) {
     super({
@@ -136,6 +140,11 @@ export class WeGameLogin extends plugin {
     const platformLabel = getPlatformLabel(platform)
     const userIdentifier = this.accountService.getUserIdentifier()
     const sessionKey = this.getSessionKey(userIdentifier)
+
+    if (!hasWeGameApiKey()) {
+      await this.replyDeduplicated('请先在 wgconfig.yaml 中填写 wegame.api_key 后再使用登录功能。', userIdentifier)
+      return true
+    }
 
     if (ACTIVE_LOGIN_SESSIONS.has(sessionKey)) {
       await this.replyDeduplicated('当前已有登录流程进行中，请先完成扫码或等待结束。', userIdentifier)
@@ -488,10 +497,8 @@ export class WeGameLogin extends plugin {
       lines.push(`角色ID：${roleId}`)
     }
 
-    if (String(Config.get('wegame', 'api_key') || '').trim()) {
+    if (hasWeGameApiKey()) {
       lines.push(`可发送 ${this.formatWeGameCommand('账号列表', { namespaced: true })} 查看已绑定账号。`)
-    } else {
-      lines.push('如需账号列表与切换账号，请先在 wgconfig.yaml 中填写 wegame.api_key。')
     }
 
     return lines.join('\n')
