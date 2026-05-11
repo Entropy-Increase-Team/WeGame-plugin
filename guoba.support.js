@@ -59,9 +59,7 @@ function buildModuleSchemas (supports) {
 
   const result = []
   for (const support of supports) {
-    const headerLabel = support.version
-      ? `${support.title} · v${support.version}`
-      : support.title
+    const headerLabel = support.title
 
     result.push({
       component: 'SOFT_GROUP_BEGIN',
