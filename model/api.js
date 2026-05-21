@@ -185,7 +185,8 @@ export default class WeGameApi {
       params,
       data,
       headers = {},
-      needBaseAuth = false
+      needBaseAuth = false,
+      timeout
     } = options
 
     const fingerprint = this.getDeviceFingerprint()
@@ -216,7 +217,8 @@ export default class WeGameApi {
         method,
         params: finalParams,
         data: finalData,
-        headers: finalHeaders
+        headers: finalHeaders,
+        ...(Number.isFinite(Number(timeout)) && Number(timeout) > 0 ? { timeout: Number(timeout) } : {})
       })
     } catch (error) {
       throw createRequestError(getErrorMessage(error), {
