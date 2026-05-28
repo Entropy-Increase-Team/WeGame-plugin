@@ -142,6 +142,21 @@ export default class WeGameApi {
     return params
   }
 
+  getClientScopeHeaders () {
+    const scope = this.getClientScopeParams()
+    const headers = {}
+
+    if (scope.client_type) {
+      headers['X-Client-Type'] = scope.client_type
+    }
+
+    if (scope.client_id) {
+      headers['X-Client-ID'] = scope.client_id
+    }
+
+    return headers
+  }
+
   buildOptionalUserScopeOptions (userIdentifier) {
     const normalized = String(userIdentifier || '').trim()
     const apiKey = String(Config.get('wegame', 'api_key') || '').trim()
@@ -152,7 +167,8 @@ export default class WeGameApi {
 
     return {
       headers: {
-        'X-User-Identifier': normalized
+        'X-User-Identifier': normalized,
+        ...this.getClientScopeHeaders()
       },
       params: {
         user_identifier: normalized,
@@ -170,7 +186,8 @@ export default class WeGameApi {
     return {
       headers: {
         'X-API-Key': this.getApiKey(),
-        'X-User-Identifier': normalized
+        'X-User-Identifier': normalized,
+        ...this.getClientScopeHeaders()
       },
       params: {
         user_identifier: normalized,
