@@ -251,7 +251,9 @@ export class WeGameLogin extends plugin {
   }
 
   getSessionKey (userIdentifier = '') {
-    return `${this.e.self_id || 'bot'}:${String(userIdentifier || this.e.user_id || '').trim()}`
+    const rawId = String(this.e.user_id || '')
+    const fallbackId = rawId.includes(':') ? rawId.slice(11) : rawId
+    return `${this.e.self_id || 'bot'}:${String(userIdentifier || fallbackId || '').trim()}`
   }
 
   async replyDeduplicated (message, userIdentifier = '') {

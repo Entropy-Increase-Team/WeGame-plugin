@@ -133,7 +133,8 @@ export default class WeGameAccountService {
   }
 
   getUserIdentifier () {
-    return String(this.e.user_id)
+    const raw = String(this.e.user_id)
+    return raw.includes(':') ? raw.slice(11) : raw
   }
 
   async getLocalCredential () {
