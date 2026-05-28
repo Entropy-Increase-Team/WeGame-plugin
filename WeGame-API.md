@@ -25,9 +25,8 @@
 - 所有游戏请求统一通过我方 `frameworkToken` 访问
 - 共享登录层与平台能力统一维护在本文件
 - 各游戏接口按游戏拆分为独立文档维护
-- 核心链路以 PostgreSQL 为主存储，Redis 提供缓存与令牌辅助能力
 
-当前仓库已经同时注册 `rocom` 和 `df` 两个共享登录 provider。默认配置仍然固定到 `rocom` 以兼容旧行为；如果你准备把共享登录拿来配合 `df` 业务使用，建议显式传 `provider=df`，或者把 `WEGAME_CREDENTIAL_PROVIDER` / `wegame.credential_provider` 改成 `df`。
+当前支持 `rocom` 和 `df` 两个共享登录 provider。建议在登录或导入凭证时显式传入目标游戏 provider，例如 `provider=df`。
 各游戏模块现在也会校验 `frameworkToken` 已持久化的 `credentialProvider`；如果 token 已明确归属 `rocom` 或 `df`，就不能再混用到另一个游戏接口上。
 
 ### 响应格式
@@ -57,6 +56,13 @@
 }
 ```
 
+### 全局请求限制
+
+- 主 API 默认单请求体上限为 `10MiB`
+- 具体上限可由服务端配置调整
+- 超过限制时返回 `413`
+- 独立 API Key 自举服务的生成接口额外限制为 `1MiB`
+
 ## 健康检查
 
 - `GET /health`
@@ -65,9 +71,9 @@
 说明：
 
 - `GET /health` 仅返回进程基础状态
-- `GET /health/detailed` 会检查 PostgreSQL 和 Redis
-- PostgreSQL 不可用时返回 `503`
-- Redis 不可用但 PostgreSQL 正常时返回 `200`，`data.status` 为 `degraded`
+- `GET /health/detailed` 返回服务依赖健康摘要
+- 核心依赖不可用时返回 `503`
+- 非核心依赖异常时可能返回 `200`，`data.status` 为 `degraded`
 
 ## 已接入游戏列表
 
@@ -134,7 +140,7 @@
 - 机器人 / 插件场景推荐先申请匿名令牌，再带 `X-Anonymous-Token` 调用 WeGame 登录接口
 - `POST /api/v1/auth/anonymous-token` 支持传 `fingerprint`
 - 如果没有传 `fingerprint`，服务端会根据请求信息自动生成一个匿名指纹
-- 匿名令牌依赖 Redis；Redis 不可用时该接口会返回 `503`
+- 临时令牌服务不可用时该接口会返回 `503`
 - 匿名令牌固定 `24` 小时过期，累计最多校验 `1000` 次
 
 请求示例：
@@ -180,7 +186,7 @@
 - Web 用户创建 / 导入的凭证，后续只能由同一个 Web 用户继续轮询、查询、刷新、删除
 - API Key 创建 / 导入的凭证，后续至少要用同一位开发者的 `WeGame API Key`；如果创建时带了 `user_identifier`，后续还必须带同一个 `user_identifier`
 - 匿名身份创建的凭证，只能由同一匿名指纹继续轮询和管理
-- 具体游戏数据接口仍然是“拿到 `frameworkToken` 就能访问对应游戏能力”；这里的 owner 约束只针对登录管理接口
+- 具体游戏数据接口也会校验当前调用身份是否有权使用这份 `frameworkToken`；API Key 场景下如果 token 带有 `user_identifier` 归属，游戏接口同样必须继续传同一个 `user_identifier`
 
 第三方客户端补充约定：
 
@@ -361,6 +367,7 @@
 
 - `user_identifier / client_type / client_id` 仅第三方客户端自动绑定时需要
 - 这三个字段既可以放在请求体里，也可以分别通过 `X-User-Identifier`、`X-Client-Type`、`X-Client-ID` 请求头或 query 参数提供
+- `user_identifier` 支持第三方用户标识符原样传入，例如 `3889750061:EC74CD08AA000D0BB72C765F04D151DF`
 - `provider` 不传时会走当前默认 provider；当前模板默认是 `rocom`
 - 如果第三方导入凭证时传了 `user_identifier`，后端会自动创建或更新账号绑定
 - 如果登录时没传 `user_identifier`，后续仍可单独调用 `POST /api/v1/user/bindings` 绑定
@@ -493,6 +500,9 @@
 - 原因是现有微信链路只拿到一次性的 `wxCode -> tgp_ticket` 结果，没有可持续复用的 refresh 凭据
 - 刷新前会先校验当前身份是否有权管理这份 `frameworkToken`
 - 如果是旧 token 且库里还没持久化 provider，可选传 `provider=<provider-name>` 帮服务补齐
+- 刷新成功后，后端会立即对新的 `tgp_id + tgp_ticket` 再做一次有效性校验
+- 只有校验通过，才会把刷新后的凭证保存回库
+- 如果刷新后的凭证校验未通过，接口会直接返回失败，不会覆盖原库数据
 
 响应示例：
 
@@ -507,6 +517,7 @@
     "credentialProvider": "rocom",
     "tgpId": "295231685",
     "loginType": "qq",
+    "isValid": true,
     "expireAt": 1775419200000
   }
 }
@@ -646,6 +657,7 @@
 - 用于把一份已保存的 `frameworkToken` 手动绑定到当前用户
 - Web 用户可直接带 `Authorization: Bearer <web-jwt>` 调用
 - 第三方客户端需要带 `X-API-Key: <wegame-api-key>`，并提供 `user_identifier`
+- `user_identifier` 支持 `3889750061:EC74CD08AA000D0BB72C765F04D151DF` 这类冒号分隔格式
 - 第三方客户端也可以通过请求体、query 参数或 `X-Client-Type` / `X-Client-ID` 请求头补充 `client_type` / `client_id`
 - `client_type` 仅允许 `web`、`bot`、`app`
 - 只能绑定当前身份自己创建 / 拥有的 `frameworkToken`；不能把别人的 token 直接抢绑定到自己名下
@@ -766,53 +778,35 @@
 - 游戏能力不再额外创建 `game:*` API Key
 - 后续访问具体游戏时，统一依据对应游戏权限决定是否放行
 
-当前开发者能力使用 PostgreSQL：
+API Key 只有一把；平台层请求统计和全部权限数据由服务端统一维护，各游戏接口统计按游戏维度记录。
 
-- `wegame.api_keys`
-- `wegame.api_permissions`
-- `wegame.api_key_permissions`
-- `wegame.api_permission_requests`
-- `wegame.api_usage_stats`
-- `game_<game_code>.api_usage_stats`
+运行时说明：
 
-也就是说，API Key 只有一把；平台层请求统计和全部权限数据都在 `wegame` schema，各游戏接口统计按游戏落在各自 schema。
+- API Key 请求会按 key 维度做每分钟限流
+- API Key 认证只使用 `key_hash`；完整 key 会加密保存，开发者可在验证后通过 reveal 接口再次查看
+- API Key 用量统计异步记录，不影响主请求返回
+- 请求日志会保留普通 query 参数，但会脱敏 `token`、`key`、`secret`、`password`、`code`、`fingerprint`、`ticket`、`cookie` 等敏感字段
+- `ip_whitelist` 支持精确 IP 和 CIDR；`origin_whitelist` 的 `*.example.com` 只匹配子域，不匹配 `example.com` 根域
 
 以下接口都要求 `Authorization: Bearer <web-jwt>`：
 
 - `GET /api/v1/developer/api-key-scopes`
 - `GET /api/v1/developer/api-keys`
 - `POST /api/v1/developer/api-keys`
+- `GET /api/v1/developer/api-keys/:id`
+- `POST /api/v1/developer/api-keys/:id/reveal`
 - `DELETE /api/v1/developer/api-keys/:id`
 - `POST /api/v1/developer/api-keys/:id/regenerate`
 - `PUT /api/v1/developer/api-keys/:id/settings`
-
-如果暂时没有 Web 用户，也可以直接在服务根目录执行：
-
-```bash
-go run ./cmd/api-keygen
-```
-
-常用参数：
-
-- `--user-id <24位ObjectID>`: 指定归属用户
-- `--scope <scope>`: 当前仅支持 `wegame`
-- `--name <名称>`: 可选，不传则自动生成开发者 WeGame API Key
-
-如果不传 `--user-id`，命令会自动生成一个新的用户 ID，并一起打印出来。
-生成完成后，后续游戏权限通过开发者控制台申请，例如 `scope=game:rocom` 下的 `rocom.access`。
-
-输出示例：
-
-```text
-database=wegame_api
-generated_user_id=true
-user_id=69d27d62b4a01afd687c1814
-api_key_id=69d27d62b4a01afd687c1815
-scope=wegame
-api_key=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-name=开发者 WeGame API Key
-rate_limit=60
-```
+- `GET /api/v1/developer/usage/summary`
+- `GET /api/v1/developer/usage/routes`
+- `GET /api/v1/developer/api-keys/:id/usage`
+- `GET /api/v1/developer/permissions`
+- `GET /api/v1/developer/permission-requests`
+- `GET /api/v1/developer/api-keys/:id/permissions`
+- `POST /api/v1/developer/api-keys/:id/permissions`
+- `DELETE /api/v1/developer/api-keys/:id/permissions/:code`
+- `DELETE /api/v1/developer/permission-requests/:id`
 
 ### 获取可用 Scope
 
@@ -855,7 +849,7 @@ rate_limit=60
         "key_prefix": "sk-3f8a...",
         "rate_limit": 60,
         "origin_whitelist": ["https://bot.example.com"],
-        "ip_whitelist": ["127.0.0.1"],
+        "ip_whitelist": ["203.0.113.10"],
         "total_calls": 128,
         "last_used_at": "2026-04-05T23:10:00+08:00",
         "created_at": "2026-04-05T22:50:00+08:00"
@@ -880,7 +874,14 @@ rate_limit=60
 
 ```json
 {
-  "name": "AstrBot Production"
+  "name": "AstrBot Production",
+  "permission_requests": [
+    {
+      "scope": "game:rocom",
+      "permission_code": "rocom.access",
+      "reason": "生产服务需要调用 RoCom 开放接口"
+    }
+  ]
 }
 ```
 
@@ -901,18 +902,59 @@ rate_limit=60
       "total_calls": 0,
       "created_at": "2026-04-05T22:50:00+08:00"
     },
-    "message": "API Key 创建成功，请妥善保管，此密钥仅显示一次"
+    "permission_requests": [
+      {
+        "id": "680000000000000000000301",
+        "scope": "game:rocom",
+        "permission_code": "rocom.access",
+        "status": "pending",
+        "reason": "生产服务需要调用 RoCom 开放接口"
+      }
+    ],
+    "permission_request_errors": [],
+    "message": "API Key 创建成功，请妥善保管；后续可通过查看接口验证后再次显示"
   }
 }
 ```
 
 如果同一用户已经创建过开发者 API Key，再次创建会直接报错。
-明文 key 不支持后续回显；如果遗失，请直接重新生成。
+
+### 查看完整 API Key
+
+`POST /api/v1/developer/api-keys/:id/reveal`
+
+请求体示例：
+
+```json
+{
+  "password": "当前登录密码"
+}
+```
+
+说明：
+
+- 必须提交当前密码；OAuth-only 且未设置密码的账号需要先设置登录密码
+- 连续验证失败会触发临时锁定，锁定期间不能继续 reveal、重新生成或删除 API Key
+- 响应会设置 `Cache-Control: no-store`
 
 ### 删除、重置 API Key
 
 - `DELETE /api/v1/developer/api-keys/:id`
 - `POST /api/v1/developer/api-keys/:id/regenerate`
+
+请求体示例：
+
+```json
+{
+  "password": "当前登录密码"
+}
+```
+
+说明：
+
+- 删除和重置都必须提交当前密码
+- OAuth-only 且未设置密码的账号需要先设置登录密码
+- 重置成功响应会设置 `Cache-Control: no-store`
 
 ### 更新 API Key 设置
 
@@ -925,14 +967,14 @@ rate_limit=60
   "name": "AstrBot Rocom Production",
   "rate_limit": 120,
   "origin_whitelist": ["https://bot.example.com"],
-  "ip_whitelist": ["127.0.0.1", "192.168.10.21"]
+  "ip_whitelist": ["203.0.113.10", "198.51.100.21"]
 }
 ```
 
 说明：
 
-- `origin_whitelist` 支持域名、完整 URL、或 `*.example.com` 这种后缀匹配
-- `ip_whitelist` 当前只支持精确 IP 匹配，不支持 CIDR 网段；无效 IP 会直接报错
+- `origin_whitelist` 支持域名、完整 URL、或 `*.example.com` 这种子域匹配；`*.example.com` 不匹配 `example.com` 根域
+- `ip_whitelist` 支持精确 IP 和 CIDR 网段，例如 `203.0.113.10` 或 `203.0.113.0/24`
 - `rate_limit` 为单 key 的每分钟请求上限，必须大于 `0`
 - 如果传入 `name`，不能为空白字符串
 - 服务端会自动裁剪空白并规范化 `origin_whitelist` / `ip_whitelist` 中的有效条目
