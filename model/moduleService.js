@@ -320,6 +320,15 @@ class ModuleService {
     )]
   }
 
+  getModuleByCommandPrefix (commandPrefix = '') {
+    const prefix = String(commandPrefix || '').trim()
+    if (!prefix) return null
+
+    return this.getInstalledModules()
+      .find((item) => (item.commandPrefixes || []).some((value) => String(value || '').trim() === prefix)) ||
+      null
+  }
+
   async downloadModule (moduleCode = '') {
     const normalized = normalizeModuleCode(moduleCode)
     if (!normalized) {

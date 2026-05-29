@@ -175,7 +175,8 @@ export default class WeGameAccountService {
       const latest = normalizeCredential(await this.api.getLoginToken(
         normalized.loginType || 'qq',
         normalized.frameworkToken,
-        this.getUserIdentifier()
+        this.getUserIdentifier(),
+        normalized.credentialProvider
       ))
 
       if (latest) {
@@ -261,7 +262,8 @@ export default class WeGameAccountService {
       await this.api.getLoginToken(
         lastCredential.loginType || 'qq',
         lastCredential.frameworkToken,
-        this.getUserIdentifier()
+        this.getUserIdentifier(),
+        lastCredential.credentialProvider
       )
     } catch (error) {}
   }

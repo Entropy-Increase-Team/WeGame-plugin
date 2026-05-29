@@ -120,6 +120,15 @@ export class WeGameLogin extends plugin {
     return prefixes.find((prefix) => text.startsWith(prefix)) || DEFAULT_COMMAND_PREFIX
   }
 
+  getCredentialProvider () {
+    const moduleItem = ModuleService.getModuleByCommandPrefix(this.getActiveCommandPrefix())
+    if (moduleItem?.code) {
+      return moduleItem.code
+    }
+
+    return this.api.getConfiguredCredentialProvider()
+  }
+
   isModulePrefixedCommand () {
     return getModuleCommandPrefixes().includes(this.getActiveCommandPrefix())
   }
@@ -140,6 +149,7 @@ export class WeGameLogin extends plugin {
     const platformLabel = getPlatformLabel(platform)
     const userIdentifier = this.accountService.getUserIdentifier()
     const sessionKey = this.getSessionKey(userIdentifier)
+    const credentialProvider = this.getCredentialProvider()
 
     if (!hasWeGameApiKey()) {
       await this.replyDeduplicated('请先在 wgconfig.yaml 中填写 wegame.api_key 后再使用登录功能。', userIdentifier)
@@ -159,14 +169,14 @@ export class WeGameLogin extends plugin {
     this.loginReplyMessageIds.clear()
 
     try {
-      const qrData = await this.api.getLoginQr(platform, userIdentifier)
+      const qrData = await this.api.getLoginQr(platform, userIdentifier, credentialProvider)
       if (!qrData?.frameworkToken || !qrData?.qr_image) {
         throw new Error('接口未返回完整二维码信息')
       }
 
       const qrReply = await this.reply(this.buildQrReply(platform, qrData))
       this.collectReplyMessageIds(qrReply)
-      const credential = await this.pollLoginResult(platform, qrData.frameworkToken, userIdentifier)
+      const credential = await this.pollLoginResult(platform, qrData.frameworkToken, userIdentifier, credentialProvider)
       const normalized = normalizeCredential(credential)
 
       if (!normalized) {
@@ -216,14 +226,14 @@ export class WeGameLogin extends plugin {
     return msg
   }
 
-  async pollLoginResult (platform, frameworkToken, userIdentifier = '') {
+  async pollLoginResult (platform, frameworkToken, userIdentifier = '', credentialProvider = '') {
     const timeoutMs = Number(Config.get('wegame', 'login_timeout_ms')) || 180000
     const intervalMs = Number(Config.get('wegame', 'login_poll_interval_ms')) || 2000
     const startTime = Date.now()
     let lastNoticeStatus = ''
 
     while (Date.now() - startTime < timeoutMs) {
-      const statusData = await this.api.getLoginStatus(platform, frameworkToken, userIdentifier)
+      const statusData = await this.api.getLoginStatus(platform, frameworkToken, userIdentifier, credentialProvider)
       const status = normalizeLoginStatus(statusData)
 
       if (status && status !== lastNoticeStatus && status === 'scanned') {
@@ -235,7 +245,7 @@ export class WeGameLogin extends plugin {
 
       if (status === 'done') {
         await this.recallLoginMessages(true)
-        return this.api.getLoginToken(platform, frameworkToken, userIdentifier)
+        return this.api.getLoginToken(platform, frameworkToken, userIdentifier, credentialProvider)
       }
 
       if (status === 'expired') {

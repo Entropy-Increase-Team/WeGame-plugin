@@ -22,6 +22,10 @@ wegame:
   # 示例：yunzai_rocom_xxxxxxxxx_abcdef1234567890
   device_fingerprint: ''
 
+  # 默认 WeGame 凭证提供器；安装多个游戏模块时建议显式设置或使用模块前缀登录
+  # 示例：rocom
+  credential_provider: ''
+
   # 请求超时时间，单位毫秒
   # 示例：15000
   request_timeout_ms: 15000

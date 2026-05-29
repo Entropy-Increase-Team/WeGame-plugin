@@ -45,6 +45,10 @@ function normalizeClientType (value) {
   return text
 }
 
+function normalizeCredentialProvider (value = '') {
+  return String(value || '').trim().toLowerCase()
+}
+
 export { createRequestError }
 
 export default class WeGameApi {
@@ -155,6 +159,20 @@ export default class WeGameApi {
     }
 
     return headers
+  }
+
+  getConfiguredCredentialProvider () {
+    return normalizeCredentialProvider(
+      Config.get('wegame', 'credential_provider') ||
+      Config.get('wegame', 'credentialprovider') ||
+      process.env.WEGAME_CREDENTIAL_PROVIDER ||
+      process.env.WEGAMECREDENTIAL_PROVIDER
+    )
+  }
+
+  buildCredentialProviderParams (provider = '') {
+    const normalized = normalizeCredentialProvider(provider) || this.getConfiguredCredentialProvider()
+    return normalized ? { provider: normalized } : {}
   }
 
   buildOptionalUserScopeOptions (userIdentifier) {
@@ -319,19 +337,24 @@ export default class WeGameApi {
     })
   }
 
-  getLoginQr (platform = 'qq', userIdentifier = '') {
+  getLoginQr (platform = 'qq', userIdentifier = '', provider = '') {
     const path = platform === 'wechat'
       ? '/api/v1/login/wegame/wechat/qr'
       : '/api/v1/login/wegame/qr'
+    const scoped = this.buildOptionalUserScopeOptions(userIdentifier)
 
     return this.request(path, {
       method: 'get',
-      ...this.buildOptionalUserScopeOptions(userIdentifier),
+      headers: scoped.headers,
+      params: {
+        ...(isPlainObject(scoped.params) ? scoped.params : {}),
+        ...this.buildCredentialProviderParams(provider)
+      },
       needBaseAuth: true
     })
   }
 
-  getLoginStatus (platform = 'qq', frameworkToken, userIdentifier = '') {
+  getLoginStatus (platform = 'qq', frameworkToken, userIdentifier = '', provider = '') {
     const path = platform === 'wechat'
       ? '/api/v1/login/wegame/wechat/status'
       : '/api/v1/login/wegame/status'
@@ -344,12 +367,15 @@ export default class WeGameApi {
         ...this.buildFrameworkHeaders(frameworkToken),
         ...(scoped.headers || {})
       },
-      params: scoped.params,
+      params: {
+        ...(isPlainObject(scoped.params) ? scoped.params : {}),
+        ...this.buildCredentialProviderParams(provider)
+      },
       needBaseAuth: true
     })
   }
 
-  getLoginToken (platform = 'qq', frameworkToken, userIdentifier = '') {
+  getLoginToken (platform = 'qq', frameworkToken, userIdentifier = '', provider = '') {
     const path = platform === 'wechat'
       ? '/api/v1/login/wegame/wechat/token'
       : '/api/v1/login/wegame/token'
@@ -362,21 +388,28 @@ export default class WeGameApi {
         ...this.buildFrameworkHeaders(frameworkToken),
         ...(scoped.headers || {})
       },
-      params: scoped.params,
+      params: {
+        ...(isPlainObject(scoped.params) ? scoped.params : {}),
+        ...this.buildCredentialProviderParams(provider)
+      },
       needBaseAuth: true
     })
   }
 
-  importLoginToken (payload = {}, userIdentifier = '') {
+  importLoginToken (payload = {}, userIdentifier = '', provider = '') {
+    const providerParams = this.buildCredentialProviderParams(payload?.provider || provider)
     return this.request('/api/v1/login/wegame/token', {
       method: 'post',
       ...this.buildOptionalUserScopeOptions(userIdentifier),
-      data: payload,
+      data: {
+        ...payload,
+        ...providerParams
+      },
       needBaseAuth: true
     })
   }
 
-  deleteLoginToken (frameworkToken, userIdentifier = '') {
+  deleteLoginToken (frameworkToken, userIdentifier = '', provider = '') {
     const scoped = this.buildOptionalUserScopeOptions(userIdentifier)
 
     return this.request('/api/v1/login/wegame/token', {
@@ -385,7 +418,10 @@ export default class WeGameApi {
         ...this.buildFrameworkHeaders(frameworkToken),
         ...(scoped.headers || {})
       },
-      params: scoped.params,
+      params: {
+        ...(isPlainObject(scoped.params) ? scoped.params : {}),
+        ...this.buildCredentialProviderParams(provider)
+      },
       needBaseAuth: true
     })
   }
