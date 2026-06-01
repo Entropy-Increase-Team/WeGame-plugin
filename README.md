@@ -1,8 +1,8 @@
 # WeGame-plugin
-# 前端正在制作
-# 测试APIKEY： sk-f9a97f99fed455ae910d028edc172078
 
 适用于 Yunzai 的 WeGame 核心插件。
+
+> 官网：https://rocom.shallow.ink 获取APIKey
 
 它不是某一个单独游戏的数据插件，而是 WeGame 的统一能力层，主要负责：
 
