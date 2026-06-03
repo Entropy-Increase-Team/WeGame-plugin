@@ -101,6 +101,14 @@ export class WeGameLogin extends plugin {
         {
           reg: buildWeGameNamespacedReg('删除账号(?:\\s+.+)?'),
           fnc: 'deleteAccount'
+        },
+        {
+          reg: buildWeGameNamespacedReg('刷新凭证'),
+          fnc: 'refreshCredential'
+        },
+        {
+          reg: buildWeGameNamespacedReg('刷新绑定(?:\\s+.+)?'),
+          fnc: 'refreshBinding'
         }
       ]
     })
@@ -208,7 +216,14 @@ export class WeGameLogin extends plugin {
 
     msg.push(
       `请使用另外一台设备的${platformLabel}扫描下方二维码完成 WeGame 登录。`,
-      `\n二维码过期时间：${expireText}`,
+      `\n二维码过期时间：${expireText}`
+    )
+
+    if (qrData.credentialProvider) {
+      msg.push(`\n归属游戏：${qrData.credentialProvider}`)
+    }
+
+    msg.push(
       '\n登录成功后会自动同步到账号绑定列表。',
       '\n\n【免责声明】',
       '\n您将通过扫码授权本插件后端服务器获取您的游戏数据。',
@@ -416,6 +431,81 @@ export class WeGameLogin extends plugin {
     return raw
   }
 
+  async refreshCredential () {
+    try {
+      const lastCredential = await this.accountService.getLocalCredential()
+      if (!lastCredential?.frameworkToken) {
+        throw new Error(`当前没有已保存的凭证，请先发送 ${this.formatWeGameCommand('qq登陆')} 或 ${this.formatWeGameCommand('wx登陆')}`)
+      }
+
+      if (lastCredential.loginType && lastCredential.loginType !== 'qq') {
+        throw new Error('当前仅支持刷新 QQ 扫码登录获取的凭证，微信扫码和手动导入的凭证不支持刷新')
+      }
+
+      const result = await this.accountService.refreshCredential(lastCredential)
+      const credential = result.credential || {}
+      const role = credential.role || {}
+
+      const lines = [result.success ? '凭证刷新成功。' : '凭证刷新失败。']
+      if (result.message) {
+        lines.push(result.message)
+      }
+
+      const nickname = role.name || '未返回'
+      if (nickname !== '未返回') {
+        lines.push(`昵称：${nickname}`)
+      }
+      lines.push(`状态：${credential.isValid !== false ? '有效' : '失效'}`)
+      lines.push(`登录方式：${getLoginTypeLabel(credential.loginType)}`)
+
+      const provider = credential.credentialProvider
+      if (provider) {
+        lines.push(`归属游戏：${provider}`)
+      }
+
+      await this.reply(lines.join('\n'))
+      return true
+    } catch (error) {
+      logger.error('[WeGame-plugin] 刷新凭证失败', error)
+      await this.reply(`刷新凭证失败：${error.message || error}`)
+      return true
+    }
+  }
+
+  async refreshBinding () {
+    try {
+      const bindings = await this.accountService.listBindings()
+      if (bindings.length === 0) {
+        throw new Error(`当前还没有已绑定的 WeGame 账号，请先发送 ${this.formatWeGameCommand('qq登陆')} 或 ${this.formatWeGameCommand('wx登陆')}`)
+      }
+
+      const raw = stripWeGameCommandPrefix(this.e.msg, '刷新绑定') || stripCommandPrefix(this.e.msg, '刷新绑定')
+      if (!raw) {
+        throw new Error(`格式：${this.formatWeGameCommand('刷新绑定 <序号>', { namespaced: true })}`)
+      }
+
+      const target = this.resolveBindingTarget(bindings, raw)
+      const result = await this.accountService.refreshBinding(target.id)
+
+      const lines = [
+        `已刷新绑定：${this.getBindingName(target)}`,
+        `登录方式：${getLoginTypeLabel(target.loginType)}`,
+        result.message || '凭证已刷新'
+      ]
+
+      if (result.newFrameworkToken) {
+        lines.push(`新凭证已生效`)
+      }
+
+      await this.reply(lines.join('\n'))
+      return true
+    } catch (error) {
+      logger.error('[WeGame-plugin] 刷新绑定失败', error)
+      await this.reply(`刷新绑定失败：${error.message || error}`)
+      return true
+    }
+  }
+
   resolveBindingTarget (bindings = [], rawTarget = '') {
     const normalized = String(rawTarget || '').trim()
     if (!normalized) {
@@ -465,6 +555,10 @@ export class WeGameLogin extends plugin {
       `更新时间：${this.formatBindingTime(binding.updatedAt)}`
     ]
 
+    if (binding.credentialProvider) {
+      lines.push(`归属游戏：${binding.credentialProvider}`)
+    }
+
     if (binding.roleId) {
       lines.push(`角色ID：${binding.roleId}`)
     }
@@ -474,6 +568,7 @@ export class WeGameLogin extends plugin {
       lines.push('说明：这里只展示 WeGame 绑定信息，具体游戏角色资料请使用对应游戏模块查询。')
       lines.push(`切换：${this.formatWeGameCommand('切换账号 <序号>', { namespaced: true })}`)
       lines.push(`删除：${this.formatWeGameCommand('删除账号 <序号>', { namespaced: true })}`)
+      lines.push(`刷新绑定：${this.formatWeGameCommand('刷新绑定 <序号>', { namespaced: true })}`)
     }
 
     return lines.join('\n')
@@ -501,6 +596,11 @@ export class WeGameLogin extends plugin {
     }
     lines.push(`状态：${this.buildStatusText(binding, credential)}`)
     lines.push(`登录方式：${getLoginTypeLabel(binding.loginType || credential.loginType)}`)
+
+    const provider = binding.credentialProvider || credential.credentialProvider
+    if (provider) {
+      lines.push(`归属游戏：${provider}`)
+    }
 
     const roleId = role.id || binding.roleId
     if (roleId) {

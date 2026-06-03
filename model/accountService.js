@@ -436,4 +436,61 @@ export default class WeGameAccountService {
       bindings: settled.bindings?.length ? settled.bindings : bindings
     }
   }
+
+  async refreshCredential (credential) {
+    const normalized = normalizeCredential(credential)
+    if (!normalized?.frameworkToken) {
+      throw new Error('缺少有效的 frameworkToken，无法刷新凭证')
+    }
+
+    const result = await this.api.refreshLoginToken(
+      normalized.frameworkToken,
+      this.getUserIdentifier(),
+      normalized.credentialProvider
+    )
+
+    const refreshed = normalizeCredential(result)
+    if (!refreshed) {
+      throw new Error('刷新成功，但返回的凭证数据不完整')
+    }
+
+    const merged = mergeCredential(normalized, refreshed) || refreshed
+    await saveLastCredential(this.getUserIdentifier(), merged)
+
+    return {
+      credential: merged,
+      success: result?.success !== false,
+      message: result?.message || ''
+    }
+  }
+
+  async refreshBinding (bindingId) {
+    const normalized = String(bindingId || '').trim()
+    if (!normalized) {
+      throw new Error('缺少绑定 ID')
+    }
+
+    const result = await this.api.refreshUserBinding(normalized, this.getUserIdentifier())
+
+    const bindings = await this.listBindings()
+    const binding = bindings.find((item) => item.id === normalized) || this.pickActiveBinding(bindings)
+    const mergedCredential = await this.buildMergedLocalCredential(bindingToCredential(binding))
+    const settled = await this.settleCredential(mergedCredential, {
+      retries: 2,
+      intervalMs: 500
+    })
+    const credential = settled.credential || mergedCredential
+
+    if (credential?.frameworkToken) {
+      await saveLastCredential(this.getUserIdentifier(), credential)
+    }
+
+    return {
+      credential,
+      binding: settled.binding || binding,
+      bindings: settled.bindings?.length ? settled.bindings : bindings,
+      newFrameworkToken: result?.framework_token || result?.frameworkToken || '',
+      message: result?.message || '凭证已刷新'
+    }
+  }
 }

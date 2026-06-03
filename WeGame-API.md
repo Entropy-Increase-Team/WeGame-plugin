@@ -27,7 +27,7 @@
 - 各游戏接口按游戏拆分为独立文档维护
 
 当前支持 `rocom` 和 `df` 两个共享登录 provider。建议在登录或导入凭证时显式传入目标游戏 provider，例如 `provider=df`。
-各游戏模块现在也会校验 `frameworkToken` 已持久化的 `credentialProvider`；如果 token 已明确归属 `rocom` 或 `df`，就不能再混用到另一个游戏接口上。
+各游戏模块现在也会校验 `frameworkToken` 已持久化的 `credentialProvider`；已明确归属 `rocom` 或 `df` 的 token 只允许访问对应 provider 的游戏接口。
 
 ### 响应格式
 
@@ -66,7 +66,7 @@
 ## 健康检查
 
 - `GET /health`
-- `GET /health/detailed`
+- `GET /health/detailed`，需要后台管理员 Web JWT 或具备 `admin.access` 的 API Key
 
 说明：
 
@@ -212,7 +212,7 @@
 - `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
 - `client_type=bot|app|web`，或 `X-Client-Type: bot|app|web`
 - `client_id=<客户端标识>`，或 `X-Client-ID: <客户端标识>`
-- `provider=<provider-name>`，可选；当前仓库默认值是 `rocom`，如果你要按 DF 规则校验请显式传 `provider=df`
+- `provider=<provider-name>`，选择 `rocom` / `df`；多 provider 且默认 provider 为空时必填
 
 说明：
 
@@ -245,9 +245,7 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
-第三方客户端补充说明：
-
-- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建的，轮询时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+第三方客户端按上方“第三方客户端补充约定”继续带同一个 `user_identifier`。
 
 响应示例：
 
@@ -284,7 +282,7 @@
 - `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
 - `client_type=bot|app|web`，或 `X-Client-Type: bot|app|web`
 - `client_id=<客户端标识>`，或 `X-Client-ID: <客户端标识>`
-- `provider=<provider-name>`，可选；当前仓库默认值是 `rocom`，如果你要按 DF 规则校验请显式传 `provider=df`
+- `provider=<provider-name>`，选择 `rocom` / `df`；多 provider 且默认 provider 为空时必填
 
 说明：
 
@@ -317,9 +315,7 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
-第三方客户端补充说明：
-
-- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建的，轮询时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+第三方客户端按上方“第三方客户端补充约定”继续带同一个 `user_identifier`。
 
 响应示例：
 
@@ -368,7 +364,7 @@
 - `user_identifier / client_type / client_id` 仅第三方客户端自动绑定时需要
 - 这三个字段既可以放在请求体里，也可以分别通过 `X-User-Identifier`、`X-Client-Type`、`X-Client-ID` 请求头或 query 参数提供
 - `user_identifier` 支持第三方用户标识符原样传入，例如 `3889750061:EC74CD08AA000D0BB72C765F04D151DF`
-- `provider` 不传时会走当前默认 provider；当前模板默认是 `rocom`
+- `provider` 用于选择 `rocom` / `df`；多 provider 且默认 provider 为空时必填
 - 如果第三方导入凭证时传了 `user_identifier`，后端会自动创建或更新账号绑定
 - 如果登录时没传 `user_identifier`，后续仍可单独调用 `POST /api/v1/user/bindings` 绑定
 - 导入得到的这份 `frameworkToken` 同样会绑定当前调用身份，后续查询 / 刷新 / 删除都要用同一身份
@@ -425,9 +421,7 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
-第三方客户端补充说明：
-
-- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建 / 导入的，查询时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+第三方客户端按上方“第三方客户端补充约定”继续带同一个 `user_identifier`。
 
 响应示例：
 
@@ -456,9 +450,7 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
-第三方客户端补充说明：
-
-- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建 / 导入的，查询时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+第三方客户端按上方“第三方客户端补充约定”继续带同一个 `user_identifier`。
 
 响应示例：
 
@@ -487,9 +479,7 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
-第三方客户端补充说明：
-
-- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建 / 导入的，刷新时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+第三方客户端按上方“第三方客户端补充约定”继续带同一个 `user_identifier`。
 
 说明：
 
@@ -499,7 +489,6 @@
 - `WeGame 微信扫码` 当前也不支持同类刷新
 - 原因是现有微信链路只拿到一次性的 `wxCode -> tgp_ticket` 结果，没有可持续复用的 refresh 凭据
 - 刷新前会先校验当前身份是否有权管理这份 `frameworkToken`
-- 如果是旧 token 且库里还没持久化 provider，可选传 `provider=<provider-name>` 帮服务补齐
 - 刷新成功后，后端会立即对新的 `tgp_id + tgp_ticket` 再做一次有效性校验
 - 只有校验通过，才会把刷新后的凭证保存回库
 - 如果刷新后的凭证校验未通过，接口会直接返回失败，不会覆盖原库数据
@@ -531,9 +520,7 @@
 
 - `X-Framework-Token: <frameworkToken>`
 
-第三方客户端补充说明：
-
-- 如果这份 `frameworkToken` 是在 API Key 场景下按 `user_identifier` 创建 / 导入的，删除时也要继续带同一个 `user_identifier`；可放在 query 参数或 `X-User-Identifier` 请求头
+第三方客户端按上方“第三方客户端补充约定”继续带同一个 `user_identifier`。
 
 说明：
 
@@ -569,9 +556,7 @@
 
 第三方客户端说明：
 
-- `user_identifier` 可放在 query 参数或 `X-User-Identifier` 请求头
-- `client_type` 可放在 query 参数 / 请求体，或 `X-Client-Type` 请求头
-- `client_id` 可放在 query 参数 / 请求体，或 `X-Client-ID` 请求头
+- 用户和客户端归属参数沿用上方“第三方客户端补充约定”
 - 第三方客户端这里统一使用开发者 `WeGame API Key`
 - 这些接口都会按当前用户作用域操作，不会串账号
 
@@ -579,9 +564,7 @@
 
 `GET /api/v1/user/bindings`
 
-第三方客户端额外参数 / 请求头：
-
-- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
+第三方客户端按本节认证方式提供 `user_identifier`。
 
 说明：
 
@@ -694,9 +677,7 @@
 
 `POST /api/v1/user/bindings/:id/primary`
 
-第三方客户端额外参数 / 请求头：
-
-- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
+第三方客户端按本节认证方式提供 `user_identifier`。
 
 说明：
 
@@ -720,9 +701,7 @@
 
 `POST /api/v1/user/bindings/:id/refresh`
 
-第三方客户端额外参数 / 请求头：
-
-- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
+第三方客户端按本节认证方式提供 `user_identifier`。
 
 说明：
 
@@ -749,9 +728,7 @@
 
 `DELETE /api/v1/user/bindings/:id`
 
-第三方客户端额外参数 / 请求头：
-
-- `user_identifier=<你的用户标识>`，或 `X-User-Identifier: <你的用户标识>`
+第三方客户端按本节认证方式提供 `user_identifier`。
 
 说明：
 
@@ -778,7 +755,7 @@
 - 游戏能力不再额外创建 `game:*` API Key
 - 后续访问具体游戏时，统一依据对应游戏权限决定是否放行
 
-API Key 只有一把；平台层请求统计和全部权限数据由服务端统一维护，各游戏接口统计按游戏维度记录。
+API Key 数量受 `web_auth.developer.max_keys_per_user` 控制；平台层请求统计和全部权限数据由服务端统一维护，各游戏接口统计按游戏维度记录。
 
 运行时说明：
 
@@ -807,6 +784,15 @@ API Key 只有一把；平台层请求统计和全部权限数据由服务端统
 - `POST /api/v1/developer/api-keys/:id/permissions`
 - `DELETE /api/v1/developer/api-keys/:id/permissions/:code`
 - `DELETE /api/v1/developer/permission-requests/:id`
+
+以下 API Key 自查接口要求 `X-API-Key`：
+
+- `GET /api/v1/developer/api-key/self/overview`
+- `GET /api/v1/developer/api-key/self/usage`
+- `GET /api/v1/developer/api-key/self/quota-packs`
+- `GET /api/v1/developer/api-key/self/balance/transactions`
+
+自查接口读取当前 API Key 归属用户的订阅、积分和量包信息，并读取当前 API Key 自身调用统计。自查接口费用计量为 `0`，查询本身不扣余额、不扣量包、不写入 API Key 用量统计。
 
 ### 获取可用 Scope
 
@@ -869,6 +855,8 @@ API Key 只有一把；平台层请求统计和全部权限数据由服务端统
 ### 创建 API Key
 
 `POST /api/v1/developer/api-keys`
+
+同一用户可创建的开发者 API Key 数量受 `web_auth.developer.max_keys_per_user` 控制，默认 `3`。
 
 请求体：
 
@@ -979,6 +967,165 @@ API Key 只有一把；平台层请求统计和全部权限数据由服务端统
 - 如果传入 `name`，不能为空白字符串
 - 服务端会自动裁剪空白并规范化 `origin_whitelist` / `ip_whitelist` 中的有效条目
 
+### API Key 自查总览
+
+`GET /api/v1/developer/api-key/self/overview`
+
+请求头：
+
+- `X-API-Key: <api-key>`
+
+说明：
+
+- 返回当前 API Key 元信息、订阅、积分余额、量包剩余、账号用量和当前 Key 用量
+- 账号用量来自订阅扣费链路，当前 Key 用量来自 API Key 统计链路
+
+响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "成功",
+  "data": {
+    "api_key": {
+      "id": "67f138724436d8d0d82f8e31",
+      "scope": "wegame",
+      "name": "AstrBot Production",
+      "key_prefix": "sk-3f8a...",
+      "rate_limit": 60,
+      "total_calls": 128,
+      "last_used_at": "2026-04-05T23:10:00+08:00",
+      "created_at": "2026-04-05T22:50:00+08:00"
+    },
+    "subscription": {
+      "plan": "pro",
+      "subscription": {
+        "plan": "pro",
+        "status": "active",
+        "billing_cycle": "monthly",
+        "started_at": "2026-04-01T00:00:00+08:00",
+        "expires_at": "2026-05-01T00:00:00+08:00"
+      }
+    },
+    "balance": {
+      "credits": 9000,
+      "total_top_up": 10000,
+      "total_spent": 1000,
+      "total_redemption": 0
+    },
+    "quota": {
+      "remaining": 800,
+      "active_packs": 2
+    },
+    "usage": {
+      "account": {
+        "plan": "pro",
+        "access_level": "standard",
+        "rate_limit": 500,
+        "monthly_included": 5000,
+        "monthly_used": 120,
+        "monthly_remaining": 4880,
+        "credits_balance": 9000,
+        "quota_pack_remaining": 800,
+        "month_requests": 120,
+        "today_requests": 10
+      },
+      "current_key": {
+        "summary": {
+          "days": 30,
+          "total_calls": 100,
+          "total_errors": 2,
+          "scope_breakdown": {
+            "game:rocom": 80,
+            "game:df": 20
+          }
+        },
+        "routes": []
+      }
+    }
+  }
+}
+```
+
+### API Key 自查用量
+
+`GET /api/v1/developer/api-key/self/usage`
+
+请求头：
+
+- `X-API-Key: <api-key>`
+
+查询参数：
+
+- `days`: 统计天数，默认 `30`
+- `from`: 开始日期或 RFC3339 时间
+- `to`: 结束日期或 RFC3339 时间
+- `limit`: 路由排行返回数量，默认 `50`
+
+说明：
+
+- 返回当前 API Key 的调用汇总和路由排行
+- `from` / `to` 优先于 `days`
+
+### API Key 自查量包
+
+`GET /api/v1/developer/api-key/self/quota-packs`
+
+请求头：
+
+- `X-API-Key: <api-key>`
+
+查询参数：
+
+- `page`: 页码，默认 `1`
+- `page_size`: 每页数量，默认 `20`，最大 `100`
+- `active_only`: 是否只返回有效且有剩余额度的量包，默认 `true`
+
+响应结构：
+
+```json
+{
+  "code": 0,
+  "message": "成功",
+  "data": {
+    "packs": [
+      {
+        "id": "680000000000000000000501",
+        "pack_type": "pack_1000",
+        "total": 1000,
+        "remaining": 800,
+        "order_id": "ORDER-20260401-001",
+        "source": "purchase",
+        "purchased_at": "2026-04-01T10:00:00+08:00",
+        "created_at": "2026-04-01T10:00:00+08:00"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "page_size": 20,
+    "active_only": true
+  }
+}
+```
+
+### API Key 自查积分流水
+
+`GET /api/v1/developer/api-key/self/balance/transactions`
+
+请求头：
+
+- `X-API-Key: <api-key>`
+
+查询参数：
+
+- `page`: 页码，默认 `1`
+- `page_size`: 每页数量，默认 `20`，最大 `100`
+
+说明：
+
+- 返回当前 API Key 归属用户的积分流水
+- 流水类型包括 `top_up`、`consume`、`redemption`、`refund`
+
 ### 游戏权限申请
 
 单一开发者 API Key 创建完成后，访问游戏接口需要再申请对应游戏权限。
@@ -1002,7 +1149,9 @@ API Key 只有一把；平台层请求统计和全部权限数据由服务端统
 
 - `DELETE /api/v1/developer/api-keys/:id/permissions/rocom.access?scope=game:rocom`
 
-当前洛克王国世界默认提供 `rocom.access` 权限，获批后即可使用 `/api/v1/games/rocom/*` 下的开放接口。
+当前洛克王国世界提供 `rocom.access` 普通开放接口权限；API Key 发布和管理换蛋广场帖子需要额外申请 `rocom.egg_exchange.post`。
+
+服务端可通过 `web_auth.developer.permission_auto_approve_enabled` 和 `web_auth.developer.permission_auto_approve` 开启权限申请自动通过；白名单格式为 `scope/permission_code`，例如 `game:rocom/rocom.access`。
 
 响应示例：
 

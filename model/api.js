@@ -426,6 +426,23 @@ export default class WeGameApi {
     })
   }
 
+  refreshLoginToken (frameworkToken, userIdentifier = '', provider = '') {
+    const scoped = this.buildOptionalUserScopeOptions(userIdentifier)
+
+    return this.request('/api/v1/login/wegame/refresh', {
+      method: 'get',
+      headers: {
+        ...this.buildFrameworkHeaders(frameworkToken),
+        ...(scoped.headers || {})
+      },
+      params: {
+        ...(isPlainObject(scoped.params) ? scoped.params : {}),
+        ...this.buildCredentialProviderParams(provider)
+      },
+      needBaseAuth: true
+    })
+  }
+
   getUserBindings (userIdentifier) {
     return this.request('/api/v1/user/bindings', {
       method: 'get',
@@ -453,6 +470,26 @@ export default class WeGameApi {
 
     return this.request(`/api/v1/user/bindings/${encodeURIComponent(normalized)}`, {
       method: 'delete',
+      ...this.buildUserScopeOptions(userIdentifier)
+    })
+  }
+
+  createUserBinding (data = {}, userIdentifier) {
+    return this.request('/api/v1/user/bindings', {
+      method: 'post',
+      ...this.buildUserScopeOptions(userIdentifier),
+      data
+    })
+  }
+
+  refreshUserBinding (bindingId, userIdentifier) {
+    const normalized = String(bindingId || '').trim()
+    if (!normalized) {
+      throw createRequestError('缺少绑定 ID')
+    }
+
+    return this.request(`/api/v1/user/bindings/${encodeURIComponent(normalized)}/refresh`, {
+      method: 'post',
       ...this.buildUserScopeOptions(userIdentifier)
     })
   }

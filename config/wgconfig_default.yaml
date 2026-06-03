@@ -22,7 +22,7 @@ wegame:
   # 示例：yunzai_rocom_xxxxxxxxx_abcdef1234567890
   device_fingerprint: ''
 
-  # 默认 WeGame 凭证提供器；安装多个游戏模块时建议显式设置或使用模块前缀登录
+  # 默认 WeGame 归属游戏；安装多个游戏模块时建议显式设置或使用模块前缀登录
   # 示例：rocom
   credential_provider: ''
 

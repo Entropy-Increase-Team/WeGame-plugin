@@ -133,6 +133,50 @@ class ModuleService {
     }
   }
 
+  async forceUpdateRepository (targetDir = pluginRoot, options = {}) {
+    const label = String(options.label || path.basename(targetDir) || '仓库').trim()
+
+    if (!hasGitRepository(targetDir)) {
+      throw new Error(`${label} 目录不是 Git 仓库，无法更新`)
+    }
+
+    const branch = await this.getRepoBranch(targetDir).catch(() => '')
+    const beforeHead = await this.getRepoHead(targetDir).catch(() => '')
+
+    const remoteRef = `origin/${branch || 'main'}`
+
+    try {
+      await this.execGit(['fetch', 'origin'], targetDir)
+    } catch (error) {
+      throw new Error(`${label} 拉取远程失败：${getGitErrorMessage(error)}`)
+    }
+
+    let resetResult
+    try {
+      resetResult = await this.execGit(['reset', '--hard', remoteRef], targetDir)
+    } catch (error) {
+      throw new Error(`${label} 强制重置失败：${getGitErrorMessage(error)}`)
+    }
+
+    const afterHead = await this.getRepoHead(targetDir).catch(() => beforeHead)
+    const updatedAt = await this.getRepoCommitTime(targetDir).catch(() => '')
+    const output = [resetResult?.stdout, resetResult?.stderr].filter(Boolean).join('\n').trim()
+    const updated = beforeHead !== afterHead
+
+    return {
+      ok: true,
+      forced: true,
+      label,
+      targetDir,
+      branch,
+      beforeHead,
+      afterHead,
+      updatedAt,
+      updated,
+      output
+    }
+  }
+
   getRegistryConfig () {
     return {
       moduleRepositoryUrl: MODULE_REPOSITORY_URL,
@@ -245,6 +289,12 @@ class ModuleService {
     })
   }
 
+  async forceUpdateCorePlugin () {
+    return this.forceUpdateRepository(pluginRoot, {
+      label: 'WeGame-plugin'
+    })
+  }
+
   async updateModule (moduleCode = '') {
     const moduleItem = this.getModuleByCode(moduleCode)
     if (!moduleItem) {
@@ -263,10 +313,31 @@ class ModuleService {
     }
   }
 
-  async updateInstalledModules (moduleCode = '') {
+  async forceUpdateModule (moduleCode = '') {
+    const moduleItem = this.getModuleByCode(moduleCode)
+    if (!moduleItem) {
+      throw new Error(`未找到已安装模块「${normalizeModuleCode(moduleCode)}」`)
+    }
+
+    const result = await this.forceUpdateRepository(path.join(modulesRoot, moduleItem.code), {
+      label: buildModuleLabel(moduleItem)
+    })
+
+    return {
+      ...result,
+      module: moduleItem,
+      code: moduleItem.code,
+      name: buildModuleLabel(moduleItem)
+    }
+  }
+
+  async updateInstalledModules (moduleCode = '', options = {}) {
+    const force = options.force === true
     const normalized = normalizeModuleCode(moduleCode)
     if (normalized) {
-      const result = await this.updateModule(normalized)
+      const result = force
+        ? await this.forceUpdateModule(normalized)
+        : await this.updateModule(normalized)
       return {
         total: 1,
         updated: result.updated ? 1 : 0,
@@ -284,7 +355,9 @@ class ModuleService {
 
     for (const moduleItem of installedModules) {
       try {
-        results.push(await this.updateModule(moduleItem.code))
+        results.push(force
+          ? await this.forceUpdateModule(moduleItem.code)
+          : await this.updateModule(moduleItem.code))
       } catch (error) {
         results.push({
           ok: false,

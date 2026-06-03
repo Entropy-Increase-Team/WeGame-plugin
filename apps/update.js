@@ -33,6 +33,11 @@ export class WeGameUpdate extends plugin {
           reg: buildCommandReg('更新(?:\\s+.*)?'),
           fnc: 'update',
           permission: 'master'
+        },
+        {
+          reg: buildCommandReg('强制更新(?:\\s+.*)?'),
+          fnc: 'forceUpdate',
+          permission: 'master'
         }
       ]
     })
@@ -136,6 +141,40 @@ export class WeGameUpdate extends plugin {
     }
   }
 
+  async forceUpdate () {
+    if (!this.e.isMaster) return false
+
+    if (updating) {
+      await this.reply('当前已有更新任务进行中，请稍后再试。')
+      return true
+    }
+
+    updating = true
+
+    try {
+      const moduleCode = this.extractForceModuleCode()
+
+      if (moduleCode) {
+        await this.reply(`正在强制更新模块：${moduleCode}`)
+        const result = await ModuleService.updateInstalledModules(moduleCode, { force: true })
+        await this.reply(this.buildModuleReply(result, moduleCode))
+        return true
+      }
+
+      await this.reply('正在强制更新 WeGame-plugin 核心与已安装模块...')
+      const coreResult = await ModuleService.forceUpdateCorePlugin()
+      const moduleResult = await this.forceUpdateAllModulesSafely()
+      await this.reply(this.buildFullReply(coreResult, moduleResult))
+      return true
+    } catch (error) {
+      logger.error('[WeGame-plugin] 强制更新失败', error)
+      await this.reply(`强制更新失败：${error.message || error}`)
+      return true
+    } finally {
+      updating = false
+    }
+  }
+
   async updateAllModulesSafely () {
     try {
       return await ModuleService.updateInstalledModules()
@@ -152,8 +191,29 @@ export class WeGameUpdate extends plugin {
     }
   }
 
+  async forceUpdateAllModulesSafely () {
+    try {
+      return await ModuleService.updateInstalledModules('', { force: true })
+    } catch (error) {
+      const message = error?.message || String(error)
+      if (!isNoInstalledModulesError(message)) {
+        logger.error('[WeGame-plugin] 模块强制更新失败', error)
+      }
+      return {
+        ok: false,
+        error: message,
+        results: []
+      }
+    }
+  }
+
   extractModuleCode () {
     const raw = stripCommandPrefix(this.e.msg, '更新')
+    return String(raw || '').trim().split(/\s+/)[0] || ''
+  }
+
+  extractForceModuleCode () {
+    const raw = stripCommandPrefix(this.e.msg, '强制更新')
     return String(raw || '').trim().split(/\s+/)[0] || ''
   }
 
@@ -167,7 +227,9 @@ export class WeGameUpdate extends plugin {
 
   buildCoreReply (result = {}) {
     const lines = [
-      result.updated ? 'WeGame-plugin 更新成功' : 'WeGame-plugin 已是最新'
+      result.forced
+        ? (result.updated ? 'WeGame-plugin 强制更新成功' : 'WeGame-plugin 已是最新')
+        : (result.updated ? 'WeGame-plugin 更新成功' : 'WeGame-plugin 已是最新')
     ]
 
     if (result.branch) {

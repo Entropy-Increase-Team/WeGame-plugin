@@ -131,6 +131,11 @@ function normalizeCredential (platformOrPayload = {}, maybePayload) {
     normalized.loginType = loginType
   }
 
+  const expireAt = payload.expireAt ?? payload.expire_at ?? null
+  if (expireAt !== null && expireAt !== undefined && expireAt !== '') {
+    normalized.expireAt = Number(expireAt) || String(expireAt)
+  }
+
   const role = normalizeRole(payload.role)
   if (role) {
     normalized.role = role
