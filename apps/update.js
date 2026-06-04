@@ -1,6 +1,7 @@
 import cfg from '../../../lib/config/config.js'
 import ModuleService from '../model/moduleService.js'
 import { buildCommandReg, formatCommand, stripCommandPrefix } from '../utils/command.js'
+import { Restart } from '../../other/restart.js'
 
 let updating = false
 const AUTO_MODULE_UPDATE_DELAY_MS = 5 * 1000
@@ -43,6 +44,10 @@ export class WeGameUpdate extends plugin {
     })
 
     this.e = e
+  }
+
+  restart () {
+    new Restart(this.e).restart()
   }
 
   init () {
@@ -90,6 +95,10 @@ export class WeGameUpdate extends plugin {
         await Bot.sendMasterMsg(this.buildModuleReply(result))
       }
 
+      if (updated > 0) {
+        setTimeout(() => this.restart(), 2000)
+      }
+
       logger.mark(`[WeGame-plugin] 自动模块更新完成：更新 ${updated} 个，失败 ${failed} 个`)
       return true
     } catch (error) {
@@ -124,6 +133,9 @@ export class WeGameUpdate extends plugin {
         await this.reply(`正在更新模块：${moduleCode}`)
         const result = await ModuleService.updateInstalledModules(moduleCode)
         await this.reply(this.buildModuleReply(result, moduleCode))
+        if (result.results?.some((item) => item.ok !== false && item.updated)) {
+          setTimeout(() => this.restart(), 2000)
+        }
         return true
       }
 
@@ -131,6 +143,9 @@ export class WeGameUpdate extends plugin {
       const coreResult = await ModuleService.updateCorePlugin()
       const moduleResult = await this.updateAllModulesSafely()
       await this.reply(this.buildFullReply(coreResult, moduleResult))
+      if (coreResult.updated || moduleResult.results?.some((item) => item.ok !== false && item.updated)) {
+        setTimeout(() => this.restart(), 2000)
+      }
       return true
     } catch (error) {
       logger.error('[WeGame-plugin] 更新失败', error)
@@ -158,6 +173,9 @@ export class WeGameUpdate extends plugin {
         await this.reply(`正在强制更新模块：${moduleCode}`)
         const result = await ModuleService.updateInstalledModules(moduleCode, { force: true })
         await this.reply(this.buildModuleReply(result, moduleCode))
+        if (result.results?.some((item) => item.ok !== false && item.updated)) {
+          setTimeout(() => this.restart(), 2000)
+        }
         return true
       }
 
@@ -165,6 +183,9 @@ export class WeGameUpdate extends plugin {
       const coreResult = await ModuleService.forceUpdateCorePlugin()
       const moduleResult = await this.forceUpdateAllModulesSafely()
       await this.reply(this.buildFullReply(coreResult, moduleResult))
+      if (coreResult.updated || moduleResult.results?.some((item) => item.ok !== false && item.updated)) {
+        setTimeout(() => this.restart(), 2000)
+      }
       return true
     } catch (error) {
       logger.error('[WeGame-plugin] 强制更新失败', error)
@@ -242,10 +263,6 @@ export class WeGameUpdate extends plugin {
       lines.push(`最后提交时间：${result.updatedAt}`)
     }
 
-    if (result.updated) {
-      lines.push('请重启 Yunzai 或重载插件使更新生效。')
-    }
-
     return lines.join('\n')
   }
 
@@ -280,11 +297,9 @@ export class WeGameUpdate extends plugin {
       lines.push(`共 ${payload.total || results.length} 个模块，更新 ${payload.updated || 0} 个，失败 ${payload.failed || 0} 个。`)
     }
 
-    if (results.some((item) => item.ok !== false && item.updated)) {
-      lines.push(`如需立即生效，请重启 Yunzai 或重载插件。`)
+    if (!moduleCode) {
+      lines.push(`可指定单模块：${formatCommand('更新 rocom')}`)
     }
-
-    lines.push(`可指定单模块：${formatCommand('更新 rocom')}`)
 
     return lines.join('\n')
   }
