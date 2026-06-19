@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import axios from 'axios'
 import { pluginRoot } from './path.js'
 import { formatCommand } from '../utils/command.js'
@@ -8,7 +9,7 @@ const modulesRoot = path.join(pluginRoot, 'modules')
 const MODULE_REPOSITORY_URL = 'https://github.com/Entropy-Increase-Team/WeGame-GameModules'
 const MODULE_REPOSITORY_DEFAULT_BRANCH = 'main'
 const MODULE_REPOSITORY_MAIN_DIR = 'WeGame-GameModules'
-const MODULE_REPOSITORY_GIT_URL = `${MODULE_REPOSITORY_URL}.git`
+const MODULE_REPOSITORY_FALLBACK_GIT_URL = `${MODULE_REPOSITORY_URL}.git`
 const MODULE_BRANCH_API_URL = 'https://api.github.com/repos/Entropy-Increase-Team/WeGame-GameModules/branches'
 const GIT_COMMAND_TIMEOUT_MS = 120000
 
@@ -26,6 +27,26 @@ function isValidModuleCode (value = '') {
 
 function hasGitRepository (targetDir = '') {
   return fs.existsSync(path.join(targetDir, '.git'))
+}
+
+function readGitRemoteUrl (targetDir = '') {
+  if (!hasGitRepository(targetDir)) return ''
+
+  try {
+    return normalizeExecOutput(execFileSync('git', [
+      '-C',
+      targetDir,
+      'config',
+      '--get',
+      'remote.origin.url'
+    ], {
+      encoding: 'utf8',
+      timeout: 5000,
+      windowsHide: true
+    }))
+  } catch {
+    return ''
+  }
 }
 
 function getGitErrorMessage (error) {
@@ -196,7 +217,7 @@ class ModuleService {
   getRegistryConfig () {
     return {
       moduleRepositoryUrl: MODULE_REPOSITORY_URL,
-      gitRepositoryUrl: MODULE_REPOSITORY_GIT_URL,
+      gitRepositoryUrl: this.getModuleRepositoryGitUrl(),
       branchApiUrl: MODULE_BRANCH_API_URL,
       defaultBranch: MODULE_REPOSITORY_DEFAULT_BRANCH,
       mainBranchDir: MODULE_REPOSITORY_MAIN_DIR
@@ -213,6 +234,14 @@ class ModuleService {
       return MODULE_REPOSITORY_DEFAULT_BRANCH
     }
     return normalized
+  }
+
+  getModuleRepositoryDir () {
+    return path.join(modulesRoot, MODULE_REPOSITORY_MAIN_DIR)
+  }
+
+  getModuleRepositoryGitUrl () {
+    return readGitRemoteUrl(this.getModuleRepositoryDir()) || MODULE_REPOSITORY_FALLBACK_GIT_URL
   }
 
   async fetchRemoteBranches () {
@@ -466,7 +495,7 @@ class ModuleService {
         '-b',
         branch,
         '--single-branch',
-        MODULE_REPOSITORY_GIT_URL,
+        this.getModuleRepositoryGitUrl(),
         targetDir
       ], pluginRoot)
     } catch (error) {
