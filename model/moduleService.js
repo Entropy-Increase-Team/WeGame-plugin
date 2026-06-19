@@ -1,7 +1,5 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import axios from 'axios'
 import { pluginRoot } from './path.js'
 import { formatCommand } from '../utils/command.js'
@@ -12,7 +10,7 @@ const MODULE_REPOSITORY_DEFAULT_BRANCH = 'main'
 const MODULE_REPOSITORY_MAIN_DIR = 'WeGame-GameModules'
 const MODULE_REPOSITORY_GIT_URL = `${MODULE_REPOSITORY_URL}.git`
 const MODULE_BRANCH_API_URL = 'https://api.github.com/repos/Entropy-Increase-Team/WeGame-GameModules/branches'
-const execFileAsync = promisify(execFile)
+const GIT_COMMAND_TIMEOUT_MS = 120000
 
 function normalizeExecOutput (value = '') {
   return String(value || '').trim()
@@ -31,6 +29,10 @@ function hasGitRepository (targetDir = '') {
 }
 
 function getGitErrorMessage (error) {
+  if (error?.killed && error?.signal) {
+    return `${error?.cmd || 'git'} 执行超时或被终止：${error.signal}`
+  }
+
   return normalizeExecOutput(error?.stderr) ||
     normalizeExecOutput(error?.stdout) ||
     normalizeExecOutput(error?.message) ||
@@ -73,12 +75,22 @@ function buildModuleLabel (moduleItem = {}) {
 }
 
 class ModuleService {
-  execGit (args = [], cwd = pluginRoot) {
-    return execFileAsync('git', args, {
+  async execGit (args = [], cwd = pluginRoot) {
+    const command = ['git', ...args]
+    const result = await Bot.exec(['git', ...args], {
       cwd,
-      timeout: 30000,
+      timeout: GIT_COMMAND_TIMEOUT_MS,
       windowsHide: true
     })
+
+    if (result.error) {
+      result.error.stdout = result.stdout
+      result.error.stderr = result.stderr
+      result.error.cmd ||= command.join(' ')
+      throw result.error
+    }
+
+    return result
   }
 
   async getRepoBranch (targetDir = pluginRoot) {
@@ -106,9 +118,11 @@ class ModuleService {
     const branch = await this.getRepoBranch(targetDir).catch(() => '')
     const beforeHead = await this.getRepoHead(targetDir).catch(() => '')
 
+    logger.mark(`[WeGame-plugin] 开始更新 ${label}`)
+
     let pullResult
     try {
-      pullResult = await this.execGit(['pull', '--ff-only'], targetDir)
+      pullResult = await this.execGit(['pull'], targetDir)
     } catch (error) {
       throw new Error(`${label} 更新失败：${getGitErrorMessage(error)}`)
     }
@@ -119,6 +133,8 @@ class ModuleService {
     const updated = beforeHead && afterHead
       ? beforeHead !== afterHead
       : !/already up[- ]to[- ]date|已经是最新/i.test(output)
+
+    logger.mark(`[WeGame-plugin] ${label} ${updated ? '更新完成' : '已是最新'}，提交：${afterHead || '未知'}`)
 
     return {
       ok: true,
@@ -445,19 +461,16 @@ class ModuleService {
     }
 
     try {
-      await execFileAsync('git', [
+      await this.execGit([
         'clone',
         '-b',
         branch,
         '--single-branch',
         MODULE_REPOSITORY_GIT_URL,
         targetDir
-      ], {
-        cwd: pluginRoot
-      })
+      ], pluginRoot)
     } catch (error) {
-      const message = error?.stderr?.trim() || error?.stdout?.trim() || error?.message || String(error)
-      throw new Error(`模块下载失败：${message}`)
+      throw new Error(`模块下载失败：${getGitErrorMessage(error)}`)
     }
 
     if (!fs.existsSync(metaPath)) {

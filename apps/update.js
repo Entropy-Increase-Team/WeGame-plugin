@@ -81,16 +81,29 @@ export class WeGameUpdate extends plugin {
     if (!this.e?.isMaster) return false
 
     const target = this.extractTarget(force)
-    if (!target) return this.updateCore(force)
+    if (!target) return this.updateCoreAndModules(force)
 
-    return this.updateModules(target, force)
+    await this.updateModules(target, force)
+    return true
+  }
+
+  async updateCoreAndModules (force = false) {
+    const moduleResult = await this.updateModules('', force, { restart: false })
+    const coreResult = await this.updateCore(force)
+    const moduleUpdated = moduleResult?.results?.some((item) => item.ok !== false && item.updated)
+
+    if (moduleUpdated && !coreResult?.updated) {
+      setTimeout(() => this.restart(), 2000)
+    }
+
+    return true
   }
 
   async updateCore (force = false) {
     const Update = await loadOtherUpdate()
     if (!Update) {
       await this.reply('未找到 plugins/other/update.js，无法更新 WeGame-plugin。')
-      return true
+      return { ok: false, updated: false }
     }
 
     const originalMsg = this.e.msg
@@ -100,21 +113,26 @@ export class WeGameUpdate extends plugin {
       const updater = new Update()
       updater.e = this.e
       updater.reply = this.reply.bind(this)
-      return await updater.update()
+      const result = await updater.update()
+      return {
+        ok: result !== false,
+        updated: Boolean(updater.isUp)
+      }
     } finally {
       this.e.msg = originalMsg
     }
   }
 
-  async updateModules (target = '', force = false) {
+  async updateModules (target = '', force = false, options = {}) {
     if (moduleUpdating) {
       await this.reply('当前已有模块更新任务进行中，请稍后再试。')
-      return true
+      return null
     }
 
-    const updateAll = isAllModuleTarget(target)
+    const updateAll = !target || isAllModuleTarget(target)
     const moduleCode = updateAll ? '' : target
     const action = force ? '强制更新' : '更新'
+    const shouldRestart = options.restart !== false
 
     moduleUpdating = true
 
@@ -123,21 +141,34 @@ export class WeGameUpdate extends plugin {
       const result = await ModuleService.updateInstalledModules(moduleCode, { force })
       await this.reply(this.buildModuleReply(result, moduleCode))
 
-      if (result.results?.some((item) => item.ok !== false && item.updated)) {
+      if (shouldRestart && result.results?.some((item) => item.ok !== false && item.updated)) {
         setTimeout(() => this.restart(), 2000)
       }
 
-      return true
+      return result
     } catch (error) {
       const message = error?.message || String(error)
       if (isNoInstalledModulesError(message)) {
         await this.reply('当前没有已安装模块可更新。')
-        return true
+        return {
+          ok: true,
+          total: 0,
+          updated: 0,
+          failed: 0,
+          results: []
+        }
       }
 
       logger.error(`[WeGame-plugin] 模块${action}失败`, error)
       await this.reply(`模块${action}失败：${message}`)
-      return true
+      return {
+        ok: false,
+        error: message,
+        total: 0,
+        updated: 0,
+        failed: 1,
+        results: []
+      }
     } finally {
       moduleUpdating = false
     }
