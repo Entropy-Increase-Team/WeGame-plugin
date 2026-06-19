@@ -8,7 +8,7 @@ const modulesRoot = path.join(pluginRoot, 'modules')
 const MODULE_REPOSITORY_URL = 'https://github.com/Entropy-Increase-Team/WeGame-GameModules'
 const MODULE_REPOSITORY_DEFAULT_BRANCH = 'main'
 const MODULE_REPOSITORY_MAIN_DIR = 'WeGame-GameModules'
-const MODULE_REPOSITORY_GIT_URL = 'git@github.com:Entropy-Increase-Team/WeGame-GameModules.git'
+const MODULE_REPOSITORY_GIT_URL = `${MODULE_REPOSITORY_URL}.git`
 const MODULE_BRANCH_API_URL = 'https://api.github.com/repos/Entropy-Increase-Team/WeGame-GameModules/branches'
 const GIT_COMMAND_TIMEOUT_MS = 120000
 
